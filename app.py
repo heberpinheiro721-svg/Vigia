@@ -444,13 +444,12 @@ footer { visibility: hidden; }
 
 # ── Autenticação ──────────────────────────────────────────────────────────────
 def _deep_dict(obj):
-    """Converte AttrDict aninhado do st.secrets em dict Python puro."""
     if hasattr(obj, 'items'):
         return {k: _deep_dict(v) for k, v in obj.items()}
     return obj
 
 if not (hasattr(st, 'secrets') and 'credentials' in st.secrets):
-    st.error("⚠️ Secrets não configurados. Adicione as credenciais no painel do Streamlit Cloud.")
+    st.error("⚠️ Secrets não configurados.")
     st.stop()
 
 _auth = stauth.Authenticate(
@@ -460,15 +459,93 @@ _auth = stauth.Authenticate(
     cookie_expiry_days=int(st.secrets['cookie']['expiry_days']),
     auto_hash=False,
 )
-_auth.login(
-    location="main",
-    single_session=False,
-    fields={"Form name": "🔍 VIGIA — Acesso Restrito",
-            "Username": "Usuário", "Password": "Senha", "Login": "Entrar"},
-)
+
 if not st.session_state.get("authentication_status"):
-    if st.session_state.get("authentication_status") is False:
-        st.error("Usuário ou senha incorretos.")
+    # ── CSS da tela de login ───────────────────────────────────────────────
+    st.markdown("""<style>
+    section[data-testid="stSidebar"] { display: none !important; }
+    header[data-testid="stHeader"]   { background: transparent !important; box-shadow: none !important; }
+    .stApp {
+        background: linear-gradient(150deg, #050C1A 0%, #0A1628 45%, #0F2244 100%) !important;
+    }
+    .main .block-container { padding-top: 0 !important; max-width: 100% !important; }
+    [data-testid="stForm"] {
+        background: rgba(255,255,255,0.04) !important;
+        border: 1px solid rgba(255,255,255,0.10) !important;
+        border-radius: 16px !important;
+        padding: 32px 28px !important;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important;
+    }
+    [data-testid="stForm"] h2,
+    [data-testid="stForm"] h3 { display: none !important; }
+    [data-testid="stForm"] label p {
+        color: #6A9AC0 !important;
+        font-size: 0.75rem !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.08em !important;
+    }
+    [data-testid="stForm"] input {
+        background: rgba(255,255,255,0.06) !important;
+        border: 1px solid rgba(255,255,255,0.14) !important;
+        border-radius: 8px !important;
+        color: #FFFFFF !important;
+        font-size: 0.95rem !important;
+    }
+    [data-testid="stForm"] input:focus {
+        border-color: #2472B5 !important;
+        box-shadow: 0 0 0 3px rgba(36,114,181,0.25) !important;
+    }
+    [data-testid="stForm"] .stButton > button {
+        width: 100% !important;
+        background: linear-gradient(90deg, #1B3A6B 0%, #2472B5 100%) !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 13px !important;
+        font-weight: 700 !important;
+        font-size: 0.95rem !important;
+        letter-spacing: 0.05em !important;
+        margin-top: 6px !important;
+        transition: opacity 0.2s !important;
+    }
+    [data-testid="stForm"] .stButton > button:hover { opacity: 0.88 !important; }
+    </style>""", unsafe_allow_html=True)
+
+    st.markdown("<div style='height:48px'></div>", unsafe_allow_html=True)
+    _, _lc, _ = st.columns([1, 1.1, 1])
+    with _lc:
+        st.markdown("""
+        <div style="text-align:center;margin-bottom:28px;">
+          <div style="display:inline-flex;align-items:center;justify-content:center;
+                      width:72px;height:72px;
+                      background:linear-gradient(135deg,rgba(27,58,107,0.6),rgba(36,114,181,0.3));
+                      border-radius:20px;border:1px solid rgba(255,255,255,0.12);
+                      font-size:2rem;margin-bottom:16px;">🔍</div>
+          <div style="font-size:2.1rem;font-weight:900;color:#FFFFFF;
+                      letter-spacing:-0.03em;line-height:1;">VIGIA</div>
+          <div style="font-size:0.68rem;color:#3A6A9A;letter-spacing:0.14em;
+                      text-transform:uppercase;margin-top:6px;">
+              Análise de Investimentos · IAJA</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        _auth.login(
+            location="main",
+            single_session=False,
+            fields={"Form name": "", "Username": "Usuário",
+                    "Password": "Senha", "Login": "Entrar"},
+        )
+        if st.session_state.get("authentication_status") is False:
+            st.error("Usuário ou senha incorretos.")
+
+        st.markdown("""
+        <div style="text-align:center;margin-top:22px;
+                    font-size:0.65rem;color:#1E3A5A;letter-spacing:0.06em;">
+            IAJA · PREVIC · Res. CMN 4.994/2022 · Acesso restrito
+        </div>
+        """, unsafe_allow_html=True)
+
     st.stop()
 
 # ── Session state ─────────────────────────────────────────────────────────────
