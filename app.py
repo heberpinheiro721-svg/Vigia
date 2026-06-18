@@ -429,7 +429,7 @@ with st.sidebar:
         "🔮 Projeção de Patrimônio": "Projeção",
         "⚖️ Simulador":          "Simulador",
         "🤖 Análise IA":          "Análise IA",
-        "💬 Chat VIGIA":          "Chat",
+        "💬 Chat Personas":       "Chat",
         "📋 Balancete":           "Balancete",
         "📄 Relatório PDF":       "Relatório PDF",
         "📰 Notícias":            "Notícias",
