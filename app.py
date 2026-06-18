@@ -1759,7 +1759,7 @@ elif pagina == 'Análise IA':
 elif pagina == 'Chat':
     _p_ativo = PERSONAS[st.session_state.chat_persona]
     st.markdown(
-        f'<div class="secao-titulo">💬 Chat com {_p_ativo["emoji"]} {_p_ativo["nome"]}</div>',
+        f'<div class="secao-titulo">💬 Chat Personas — {_p_ativo["emoji"]} {_p_ativo["nome"]}</div>',
         unsafe_allow_html=True,
     )
 
