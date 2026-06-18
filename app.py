@@ -262,25 +262,31 @@ footer { visibility: hidden; }
 [data-testid="stToolbar"] { display: none !important; }
 [data-testid="stDecoration"] { display: none !important; }
 
-/* Navegação mobile — escondida no desktop */
-.mobile-nav-wrap { display: none !important; }
-@media screen and (max-width: 768px) {
-    .mobile-nav-wrap {
-        display: block !important;
-        position: sticky !important;
-        top: 0 !important;
-        z-index: 900 !important;
-        background: #FFFFFF !important;
-        padding: 6px 0 4px 0 !important;
-        border-bottom: 2px solid #1B3A6B !important;
-        margin-bottom: 10px !important;
+/* Navegação mobile — radio escondido no desktop */
+@media screen and (min-width: 769px) {
+    [data-testid="stRadio"][aria-label="📱 Módulo"],
+    div:has(> [data-testid="stRadio"] > label[data-baseweb="radio"]:first-child) {
+        display: none !important;
     }
-    /* Impede digitação no selectbox mobile — só touch/clique */
-    .mobile-nav-wrap input {
-        pointer-events: none !important;
-        caret-color: transparent !important;
-        user-select: none !important;
-        -webkit-user-select: none !important;
+}
+@media screen and (max-width: 768px) {
+    /* Estilo do radio de navegação mobile */
+    [data-testid="stRadio"] > div {
+        flex-direction: column !important;
+        gap: 0 !important;
+        border: 1px solid #D0D8E4 !important;
+        border-radius: 10px !important;
+        overflow: hidden !important;
+        background: #FFFFFF !important;
+    }
+    [data-testid="stRadio"] > div > label {
+        padding: 10px 14px !important;
+        border-bottom: 1px solid #EEF2F7 !important;
+        font-size: 0.88rem !important;
+        margin: 0 !important;
+    }
+    [data-testid="stRadio"] > div > label:last-child {
+        border-bottom: none !important;
     }
 }
 
@@ -498,6 +504,7 @@ with st.sidebar:
     )
     if MODULOS[pagina_label] != st.session_state.active_page:
         st.session_state.active_page = MODULOS[pagina_label]
+        st.session_state['_nav_source'] = 'sidebar'
         st.rerun()
 
     st.markdown("---")
@@ -680,33 +687,20 @@ except Exception:
 _mob_keys = list(MODULOS.keys())
 _mob_vals = list(MODULOS.values())
 _mob_label = _mob_keys[_mob_vals.index(st.session_state.active_page)] if st.session_state.active_page in _mob_vals else _mob_keys[0]
-if st.session_state.get('_mob_nav') != _mob_label:
-    st.session_state['_mob_nav'] = _mob_label
-st.markdown('<div class="mobile-nav-wrap">', unsafe_allow_html=True)
-_mob_sel = st.selectbox("Módulo", _mob_keys, key="_mob_nav", label_visibility="collapsed")
-st_components.html("""
-<script>
-(function() {
-    function noKeyboard() {
-        try {
-            var inputs = window.parent.document.querySelectorAll('.mobile-nav-wrap input');
-            inputs.forEach(function(el) {
-                el.setAttribute('readonly', '');
-                el.setAttribute('inputmode', 'none');
-            });
-        } catch(e) {}
-    }
-    noKeyboard();
-    setTimeout(noKeyboard, 400);
-    setTimeout(noKeyboard, 1200);
-    var obs = new MutationObserver(noKeyboard);
-    try { obs.observe(window.parent.document.body, {childList:true, subtree:true}); } catch(e) {}
-})();
-</script>
-""", height=0, scrolling=False)
-st.markdown('</div>', unsafe_allow_html=True)
+
+# Sincroniza o radio mobile quando a navegação veio da sidebar
+if st.session_state.get('_nav_source') == 'sidebar':
+    st.session_state['_mob_radio'] = _mob_label
+    st.session_state['_nav_source'] = None
+
+_mob_radio_idx = _mob_keys.index(st.session_state.get('_mob_radio', _mob_label))
+_mob_sel = st.radio("📱 Módulo", _mob_keys, index=_mob_radio_idx,
+                    key="_mob_radio", label_visibility="collapsed",
+                    horizontal=False)
+
 if MODULOS[_mob_sel] != st.session_state.active_page:
     st.session_state.active_page = MODULOS[_mob_sel]
+    st.session_state['_nav_source'] = 'mobile'
     st.rerun()
 
 pagina = st.session_state.active_page
