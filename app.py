@@ -694,14 +694,14 @@ if st.session_state.get('_nav_source') == 'sidebar':
     st.session_state['_nav_source'] = None
 
 _mob_radio_idx = _mob_keys.index(st.session_state.get('_mob_radio', _mob_label))
-_mob_sel = st.radio("📱 Módulo", _mob_keys, index=_mob_radio_idx,
-                    key="_mob_radio", label_visibility="collapsed",
-                    horizontal=False)
-
-if MODULOS[_mob_sel] != st.session_state.active_page:
-    st.session_state.active_page = MODULOS[_mob_sel]
-    st.session_state['_nav_source'] = 'mobile'
-    st.rerun()
+with st.expander(f"☰  {_mob_label}", expanded=False):
+    _mob_sel = st.radio("Módulo", _mob_keys, index=_mob_radio_idx,
+                        key="_mob_radio", label_visibility="collapsed",
+                        horizontal=False)
+    if MODULOS[_mob_sel] != st.session_state.active_page:
+        st.session_state.active_page = MODULOS[_mob_sel]
+        st.session_state['_nav_source'] = 'mobile'
+        st.rerun()
 
 pagina = st.session_state.active_page
 
