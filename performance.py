@@ -48,7 +48,7 @@ def load_cotas(filepath) -> pd.DataFrame:
         'dia', 'mes', 'ano', 'total',
     ]
 
-    df['Data']       = pd.to_datetime(df['data'], format='%d/%m/%Y')
+    df['Data']       = pd.to_datetime(df['data'], format='mixed', dayfirst=True)
     df['Cota']       = df['cota'].apply(_num)
     df['Patrimônio'] = df['patrimonio'].apply(_num)
     df['Cliente']    = df['cliente']

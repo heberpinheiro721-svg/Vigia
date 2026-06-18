@@ -16,6 +16,7 @@ from report_generator import gerar_pdf
 from historico import salvar_snapshot, carregar_historico, historico_para_dataframe
 from performance import load_cotas, ultima_posicao, achar_cotas_csv
 from balancete_parser import parse_balancete, achar_balancete, listar_balancetes
+from evolucao_mensal import montar_tabela_mensal, tabela_para_texto
 from bcb_api import get_benchmarks
 from analytics import (calcular_risco_retorno, concentracao_gestores,
                        calcular_meta_atuarial, simular_realocacao,
@@ -637,6 +638,7 @@ with st.sidebar:
     st.markdown("### 📂 Módulos")
     MODULOS = {
         "📊 Dashboard":           "Dashboard",
+        "📅 Evolução Mensal":     "Evolução Mensal",
         "📉 Performance":         "Performance",
         "🏆 Comparativo de Mercado": "Comparativo",
         "📈 Risco Avançado":      "Risco Avançado",
@@ -1441,6 +1443,116 @@ if pagina == 'Dashboard':
                     if briefing_key in st.session_state:
                         del st.session_state[briefing_key]
                     st.rerun()
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MÓDULO: EVOLUÇÃO MENSAL
+# ══════════════════════════════════════════════════════════════════════════════
+elif pagina == 'Evolução Mensal':
+    st.markdown('<div class="secao-titulo">📅 Evolução Mensal</div>', unsafe_allow_html=True)
+    st.caption("Retornos mensais dos planos frente aos principais benchmarks.")
+
+    if df_cotas is None:
+        st.info("Arquivo de cotas não encontrado em `data/cotas/`.")
+        st.stop()
+
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def _tabela_mensal_cached(_df, cache_key: str):
+        return montar_tabela_mensal(_df)
+
+    _cache_key = f"{df_cotas['Data'].min().date()}_{df_cotas['Data'].max().date()}"
+
+    with st.spinner("Buscando dados de benchmarks..."):
+        df_tab = _tabela_mensal_cached(df_cotas, _cache_key)
+
+    if df_tab.empty:
+        st.warning("Sem dados suficientes para montar a tabela.")
+        st.stop()
+
+    # ── Tabela com formatação de cor ────────────────────────────────────────
+    st.markdown("#### Retornos Mensais (%)")
+    st.caption("Verde = plano superou o CDI no mês · Vermelho = abaixo do CDI")
+
+    def _cor_plano(val, cdi_val):
+        if pd.isna(val) or pd.isna(cdi_val):
+            return ''
+        cor = '#1a472a' if val >= cdi_val else '#5c1a1a'
+        return f'background-color:{cor};color:white;font-weight:600'
+
+    def _estilo_tabela(df):
+        styles = pd.DataFrame('', index=df.index, columns=df.columns)
+        for plano in ['Alpha', 'Beta', 'Gama']:
+            if plano in df.columns and 'CDI' in df.columns:
+                for idx in df.index:
+                    styles.loc[idx, plano] = _cor_plano(df.loc[idx, plano], df.loc[idx, 'CDI'])
+        return styles
+
+    st.dataframe(
+        df_tab.style.apply(_estilo_tabela, axis=None).format(
+            {c: (lambda x: f"{x:+.2f}%" if not pd.isna(x) else "—")
+             for c in df_tab.columns}
+        ),
+        use_container_width=True,
+        height=min(50 + len(df_tab) * 38, 600),
+    )
+
+    # ── Resumo rápido ────────────────────────────────────────────────────────
+    st.markdown("---")
+    _meses_disp = len(df_tab)
+    _planos_cols = [c for c in ['Alpha', 'Beta', 'Gama'] if c in df_tab.columns]
+    if _planos_cols and 'CDI' in df_tab.columns:
+        _c1, _c2, _c3, _c4 = st.columns(4)
+        _c1.metric("Meses disponíveis", _meses_disp)
+        for _i, _plano in enumerate(_planos_cols):
+            _acima = int((df_tab[_plano] >= df_tab['CDI']).sum())
+            [_c2, _c3, _c4][_i].metric(
+                f"{_plano} acima CDI",
+                f"{_acima}/{_meses_disp} meses",
+                f"{_acima/_meses_disp:.0%}",
+            )
+
+    # ── Análise IA ──────────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("#### 🤖 Análise por IA")
+
+    if not api_key:
+        st.info("Configure a chave Groq em Secrets para habilitar a análise por IA.")
+    else:
+        if st.button("Gerar Análise", type="primary", key="btn_analise_mensal"):
+            _texto_tab = tabela_para_texto(df_tab)
+            _prompt_mensal = f"""Você é analista sênior de investimentos de uma EFPC (previdência fechada complementar).
+Analise o desempenho mensal dos planos do IAJA frente aos benchmarks abaixo.
+
+Dados — retornos mensais em % (CDI, IPCA, INPC, Ibovespa = benchmarks | Alpha, Beta, Gama = planos):
+{_texto_tab}
+
+Metas atuariais oficiais (Política de Investimentos 2025-2029):
+  Alpha (BD): INPC + 5,24% ao ano
+  Beta  (CV): INPC + 4,50% ao ano
+  Gama  (CV): INPC + 4,50% ao ano
+
+Faça uma análise clara, objetiva e estruturada com:
+1. Desempenho vs CDI — quais meses os planos superaram ou ficaram abaixo do CDI e por quanto
+2. Desempenho vs Meta Atuarial — se o ritmo mensal é compatível com atingir a meta anual
+3. Comparação entre planos — qual teve melhor desempenho e em quais meses
+4. Tendência — os retornos estão melhorando, piorando ou estáveis ao longo dos meses
+5. Pontos de atenção para o Conselho Deliberativo — destaque até 3 pontos críticos
+
+Seja direto e factual. Use linguagem adequada para conselheiros não técnicos."""
+
+            with st.spinner("Analisando..."):
+                from ai_analysis import _groq_call
+                try:
+                    _resp_mensal = _groq_call(
+                        messages=[{"role": "user", "content": _prompt_mensal}],
+                        model="llama-3.3-70b-versatile",
+                        max_tokens=1200,
+                        temperature=0.4,
+                        api_keys=api_key,
+                    )
+                    st.markdown(_resp_mensal)
+                except Exception as _e:
+                    st.error(f"Erro na análise IA: {_e}")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # MÓDULO: PERFORMANCE
