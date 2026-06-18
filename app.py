@@ -15,7 +15,7 @@ from email_sender import enviar_relatorio_email
 from report_generator import gerar_pdf
 from historico import salvar_snapshot, carregar_historico, historico_para_dataframe
 from performance import load_cotas, ultima_posicao, achar_cotas_csv
-from balancete_parser import parse_balancete, achar_balancete
+from balancete_parser import parse_balancete, achar_balancete, listar_balancetes
 from bcb_api import get_benchmarks
 from analytics import (calcular_risco_retorno, concentracao_gestores,
                        calcular_meta_atuarial, simular_realocacao,
@@ -2303,12 +2303,18 @@ elif pagina == 'Chat':
 elif pagina == 'Balancete':
     st.markdown('<div class="secao-titulo">📋 Balancete Contábil</div>', unsafe_allow_html=True)
 
-    if not bal_dados:
-        st.info("Adicione o PDF do balancete na pasta `data/Balancete/`.")
+    _todos_bal = listar_balancetes(data_dir)
+    if not _todos_bal:
+        st.info("Adicione o balancete (XLSX ou PDF) na pasta `data/Balancete/`.")
         st.stop()
 
-    con = bal_dados['consolidado']
-    planos = bal_dados['planos']
+    _nomes_bal = [f.name for f in _todos_bal]
+    _sel_bal = st.selectbox("Selecionar período:", _nomes_bal, index=0, key="sel_balancete")
+    _path_sel = _todos_bal[_nomes_bal.index(_sel_bal)]
+    _dados_sel = _cached_balancete(str(_path_sel), _path_sel.stat().st_mtime)
+
+    con = _dados_sel['consolidado']
+    planos = _dados_sel['planos']
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("PL Alpha", f"R$ {planos['Alpha']['patrimonio_social']/1e6:.1f} MM",
@@ -2336,10 +2342,11 @@ elif pagina == 'Balancete':
     with col_emp:
         st.markdown("**Empréstimos a Participantes**")
         total_emp = con['emprestimos_participantes']
-        pct_emp = total_emp / pl
+        _ps_sel = con['patrimonio_social']
+        pct_emp = total_emp / _ps_sel if _ps_sel else 0.0
         ea, eb, ec = st.columns(3)
         ea.metric("Saldo Total", f"R$ {total_emp/1e6:.2f} MM")
-        eb.metric("Limite 15% PS", f"R$ {pl*0.15/1e6:.1f} MM")
+        eb.metric("Limite 15% PS", f"R$ {_ps_sel*0.15/1e6:.1f} MM")
         ec.metric("% do PS", f"{pct_emp:.2%}",
                   "🟢 Conforme" if pct_emp <= 0.12 else "🟡 Atenção")
 

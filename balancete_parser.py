@@ -155,13 +155,22 @@ def parse_balancete(filepath) -> dict:
     return _parse_pdf(filepath)
 
 
+def listar_balancetes(data_dir: Path) -> list:
+    """Retorna todos os arquivos de balancete (XLSX e PDF) ordenados do mais recente ao mais antigo."""
+    bal_dir = data_dir / 'Balancete'
+    if not bal_dir.exists():
+        return []
+    arquivos = list(bal_dir.glob('*.xlsx')) + list(bal_dir.glob('*.pdf'))
+    return sorted(arquivos, key=lambda x: x.name, reverse=True)
+
+
 def achar_balancete(data_dir: Path):
+    """Retorna o balancete mais recente (XLSX preferido sobre PDF)."""
     bal_dir = data_dir / 'Balancete'
     if bal_dir.exists():
-        # Prioriza XLSX (mais recente por mtime), depois PDF
         for padrao in ('*.xlsx', '*.pdf'):
             arquivos = sorted(bal_dir.glob(padrao),
-                              key=lambda x: x.stat().st_mtime, reverse=True)
+                              key=lambda x: x.name, reverse=True)
             if arquivos:
                 return arquivos[0]
     return None
