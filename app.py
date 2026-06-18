@@ -853,7 +853,7 @@ if pagina == 'Dashboard':
     _usos = [s.get('pct_limite', 0) for s in resumo if s.get('valor', 0) > 0]
     pts_risco = max(0.0, 20.0 * (1 - (sum(_usos) / len(_usos) if _usos else 0)))
 
-    # Performance vs meta atuarial (40 pts)
+    # Performance vs meta atuarial (40 pts) — escala contínua: ≥0%→1.0, -6%→0.0
     if df_cotas is not None:
         _meta_s = calcular_meta_atuarial(
             df_cotas, b.get('inpc_mes', 0.0), b.get('inpc_ano', 0.0),
@@ -861,7 +861,7 @@ if pagina == 'Dashboard':
         )
         _pl_s = _meta_s['planos']
         if not _pl_s.empty:
-            _scores = [1.0 if r['Δ Ano (%)'] >= 0 else (0.5 if r['Δ Ano (%)'] >= -2 else 0.0)
+            _scores = [max(0.0, min(1.0, (r['Δ Ano (%)'] + 6) / 6))
                        for _, r in _pl_s.iterrows()]
             pts_perf = sum(_scores) / len(_scores) * 40
         else:
@@ -891,54 +891,39 @@ if pagina == 'Dashboard':
         p = v / mx * 100
         return "#27AE60" if p >= 75 else ("#E67E22" if p >= 40 else "#E74C3C")
 
-    st.markdown(f"""
-    <div style="background:{_sbg};border:1px solid {_sc}33;border-left:4px solid {_sc};
-                border-radius:12px;padding:14px 20px;margin:10px 0 18px 0;">
-      <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
-
-        <!-- Score -->
-        <div style="min-width:80px;text-align:center;">
-          <div style="font-size:2.8rem;font-weight:900;color:{_sc};line-height:1;">{saude}</div>
-          <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.08em;
-                      text-transform:uppercase;color:{_sc};opacity:0.75;">/ 100</div>
-        </div>
-
-        <!-- Barra + label -->
-        <div style="flex:1;min-width:180px;">
-          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-            <div style="font-size:1.0rem;font-weight:800;color:{_sc};">Saúde da Carteira</div>
-            <div style="font-size:0.85rem;font-weight:700;color:{_sc};">{_sl}</div>
-          </div>
-          <div style="background:rgba(0,0,0,0.10);border-radius:99px;height:10px;overflow:hidden;">
-            <div style="width:{_bar_w}%;height:100%;background:{_sc};border-radius:99px;
-                        transition:width 0.6s ease;"></div>
-          </div>
-          <!-- Sub-scores -->
-          <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
-            <div style="background:rgba(0,0,0,0.06);border-radius:8px;padding:5px 10px;text-align:center;">
-              <div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;
-                          letter-spacing:0.05em;">Compliance</div>
-              <div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_comp,40)};">
-                {_sub_comp}<span style="font-size:0.65rem;color:#8AAECB;">/40</span></div>
-            </div>
-            <div style="background:rgba(0,0,0,0.06);border-radius:8px;padding:5px 10px;text-align:center;">
-              <div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;
-                          letter-spacing:0.05em;">Performance</div>
-              <div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_perf,40)};">
-                {_sub_perf}<span style="font-size:0.65rem;color:#8AAECB;">/40</span></div>
-            </div>
-            <div style="background:rgba(0,0,0,0.06);border-radius:8px;padding:5px 10px;text-align:center;">
-              <div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;
-                          letter-spacing:0.05em;">Risco</div>
-              <div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_risco,20)};">
-                {_sub_risco}<span style="font-size:0.65rem;color:#8AAECB;">/20</span></div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        f'<div style="background:{_sbg};border:1px solid {_sc}44;border-left:4px solid {_sc};'
+        f'border-radius:12px;padding:14px 20px;margin:10px 0 18px 0;">'
+        f'<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">'
+        f'<div style="min-width:80px;text-align:center;">'
+        f'<div style="font-size:2.8rem;font-weight:900;color:{_sc};line-height:1;">{saude}</div>'
+        f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:0.08em;'
+        f'text-transform:uppercase;color:{_sc};">/ 100</div>'
+        f'</div>'
+        f'<div style="flex:1;min-width:180px;">'
+        f'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">'
+        f'<div style="font-size:1.0rem;font-weight:800;color:{_sc};">Saúde da Carteira</div>'
+        f'<div style="font-size:0.85rem;font-weight:700;color:{_sc};">{_sl}</div>'
+        f'</div>'
+        f'<div style="background:rgba(0,0,0,0.10);border-radius:99px;height:10px;overflow:hidden;">'
+        f'<div style="width:{_bar_w}%;height:100%;background:{_sc};border-radius:99px;"></div>'
+        f'</div>'
+        f'<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">'
+        f'<div style="background:rgba(0,0,0,0.06);border-radius:8px;padding:5px 10px;text-align:center;">'
+        f'<div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;">Compliance</div>'
+        f'<div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_comp,40)};">'
+        f'{_sub_comp}<span style="font-size:0.65rem;color:#8AAECB;">/40</span></div></div>'
+        f'<div style="background:rgba(0,0,0,0.06);border-radius:8px;padding:5px 10px;text-align:center;">'
+        f'<div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;">Performance</div>'
+        f'<div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_perf,40)};">'
+        f'{_sub_perf}<span style="font-size:0.65rem;color:#8AAECB;">/40</span></div></div>'
+        f'<div style="background:rgba(0,0,0,0.06);border-radius:8px;padding:5px 10px;text-align:center;">'
+        f'<div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;">Risco</div>'
+        f'<div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_risco,20)};">'
+        f'{_sub_risco}<span style="font-size:0.65rem;color:#8AAECB;">/20</span></div></div>'
+        f'</div></div></div></div>',
+        unsafe_allow_html=True,
+    )
 
     # ══════════════════════════════════════════════════════════════════════════
     # LINHA 2: Alocação | Meta Atuarial | Benchmarks
