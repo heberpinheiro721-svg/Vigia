@@ -9,10 +9,14 @@ MESES_PT = {
 }
 
 PLANOS_MAP = {
-    'PL Alpha': 'Alpha',
-    'PL Beta':  'Beta',
-    'PL Gama':  'Gama',
+    'PL Alpha':      'Alpha',
+    'PL Beta':       'Beta',
+    'PL Gama':       'Gama',
+    'Administrativo': 'PGA',
 }
+
+# Ordem de exibição: benchmarks primeiro, planos depois
+ORDEM_LINHAS = ['CDI', 'IPCA', 'INPC', 'Ibovespa', 'Alpha', 'Beta', 'Gama', 'PGA']
 
 
 def _label(period) -> str:
@@ -27,8 +31,6 @@ def retornos_mensais_cotas(df_cotas: pd.DataFrame) -> pd.DataFrame:
     periodo_atual = pd.Period(datetime.today(), freq='M')
     df = df_cotas[df_cotas['fundo'].isin(PLANOS_MAP.keys())].copy()
     df['Periodo'] = df['Data'].dt.to_period('M')
-    # Filtra: apenas períodos a partir do primeiro mês completo (≥ 2026-03)
-    # e não além do mês corrente (sem dados futuros)
     df = df[(df['Periodo'] >= pd.Period('2026-03', freq='M')) &
             (df['Periodo'] <= periodo_atual)]
     idx = df.groupby(['fundo', 'Periodo'])['Data'].idxmax()
@@ -55,23 +57,31 @@ def benchmarks_mensais(periodos: list) -> pd.DataFrame:
 
 def montar_tabela_mensal(df_cotas: pd.DataFrame) -> pd.DataFrame:
     """
-    Retorna DataFrame com retornos mensais de todos os planos + benchmarks.
-    Índice: string 'Mar/26', 'Abr/26', etc.
+    Retorna DataFrame transposto: linhas = indicadores/planos, colunas = períodos.
+    Ex: index=['CDI','IPCA','INPC','Ibovespa','Alpha','Beta','Gama','PGA'],
+        columns=['Mar/26','Abr/26',...]
     """
     ret = retornos_mensais_cotas(df_cotas)
     if ret.empty:
         return pd.DataFrame()
     bm = benchmarks_mensais(ret.index.tolist())
-    df = pd.concat([bm, ret], axis=1)
+    df = pd.concat([bm, ret], axis=1)          # linhas=período, colunas=indicadores
     df.index = [_label(p) for p in df.index]
-    df.index.name = 'Período'
-    return df
+    df = df.T                                   # transpõe: linhas=indicadores, colunas=períodos
+    df.index.name = 'Indicador'
+    df.columns.name = None
+    # Garante a ordem correta das linhas
+    ordem = [r for r in ORDEM_LINHAS if r in df.index]
+    return df.reindex(ordem)
 
 
 def tabela_para_texto(df: pd.DataFrame) -> str:
-    """Formata o DataFrame em texto legível para o prompt da IA."""
+    """
+    Formata o DataFrame transposto em texto legível para o prompt da IA.
+    df: linhas=indicadores, colunas=períodos
+    """
     linhas = []
-    for periodo, row in df.iterrows():
+    for indicador, row in df.iterrows():
         partes = [f"{col}={row[col]:+.2f}%" for col in df.columns if not pd.isna(row[col])]
-        linhas.append(f"  {periodo}: {', '.join(partes)}")
+        linhas.append(f"  {indicador}: {', '.join(partes)}")
     return '\n'.join(linhas)

@@ -1468,43 +1468,48 @@ elif pagina == 'Evolução Mensal':
         st.warning("Sem dados suficientes para montar a tabela.")
         st.stop()
 
-    # ── Tabela com formatação de cor ────────────────────────────────────────
+    # ── Tabela: linhas = indicadores/planos, colunas = períodos ────────────
     st.markdown("#### Retornos Mensais (%)")
-    st.caption("Verde = plano superou o CDI no mês · Vermelho = abaixo do CDI")
+    st.caption("Verde = plano superou o CDI no período · Vermelho = abaixo do CDI")
 
-    def _cor_plano(val, cdi_val):
-        if pd.isna(val) or pd.isna(cdi_val):
-            return ''
-        cor = '#1a472a' if val >= cdi_val else '#5c1a1a'
-        return f'background-color:{cor};color:white;font-weight:600'
+    _PLANOS_DISP = ['Alpha', 'Beta', 'Gama', 'PGA']
 
-    def _estilo_tabela(df):
+    def _estilo_transposto(df):
+        # df: linhas=indicadores, colunas=períodos
         styles = pd.DataFrame('', index=df.index, columns=df.columns)
-        for plano in ['Alpha', 'Beta', 'Gama']:
-            if plano in df.columns and 'CDI' in df.columns:
-                for idx in df.index:
-                    styles.loc[idx, plano] = _cor_plano(df.loc[idx, plano], df.loc[idx, 'CDI'])
+        if 'CDI' not in df.index:
+            return styles
+        cdi_row = df.loc['CDI']
+        for plano in _PLANOS_DISP:
+            if plano not in df.index:
+                continue
+            for col in df.columns:
+                v_plano = df.loc[plano, col]
+                v_cdi   = cdi_row[col]
+                if pd.isna(v_plano) or pd.isna(v_cdi):
+                    continue
+                cor = '#1a472a' if v_plano >= v_cdi else '#5c1a1a'
+                styles.loc[plano, col] = f'background-color:{cor};color:white;font-weight:600'
         return styles
 
     st.dataframe(
-        df_tab.style.apply(_estilo_tabela, axis=None).format(
-            {c: (lambda x: f"{x:+.2f}%" if not pd.isna(x) else "—")
-             for c in df_tab.columns}
+        df_tab.style.apply(_estilo_transposto, axis=None).format(
+            lambda x: f"{x:+.2f}%" if not pd.isna(x) else "—"
         ),
         use_container_width=True,
-        height=min(50 + len(df_tab) * 38, 600),
+        height=min(80 + len(df_tab) * 38, 500),
     )
 
     # ── Resumo rápido ────────────────────────────────────────────────────────
     st.markdown("---")
-    _meses_disp = len(df_tab)
-    _planos_cols = [c for c in ['Alpha', 'Beta', 'Gama'] if c in df_tab.columns]
-    if _planos_cols and 'CDI' in df_tab.columns:
-        _c1, _c2, _c3, _c4 = st.columns(4)
-        _c1.metric("Meses disponíveis", _meses_disp)
-        for _i, _plano in enumerate(_planos_cols):
-            _acima = int((df_tab[_plano] >= df_tab['CDI']).sum())
-            [_c2, _c3, _c4][_i].metric(
+    _meses_disp = len(df_tab.columns)
+    _planos_presentes = [p for p in _PLANOS_DISP if p in df_tab.index]
+    if _planos_presentes and 'CDI' in df_tab.index:
+        _cols_res = st.columns(1 + len(_planos_presentes))
+        _cols_res[0].metric("Meses disponíveis", _meses_disp)
+        for _i, _plano in enumerate(_planos_presentes):
+            _acima = int((df_tab.loc[_plano] >= df_tab.loc['CDI']).sum())
+            _cols_res[_i + 1].metric(
                 f"{_plano} acima CDI",
                 f"{_acima}/{_meses_disp} meses",
                 f"{_acima/_meses_disp:.0%}",
