@@ -443,11 +443,21 @@ footer { visibility: hidden; }
 """, unsafe_allow_html=True)
 
 # ── Autenticação ──────────────────────────────────────────────────────────────
+def _deep_dict(obj):
+    """Converte AttrDict aninhado do st.secrets em dict Python puro."""
+    if hasattr(obj, 'items'):
+        return {k: _deep_dict(v) for k, v in obj.items()}
+    return obj
+
+if not (hasattr(st, 'secrets') and 'credentials' in st.secrets):
+    st.error("⚠️ Secrets não configurados. Adicione as credenciais no painel do Streamlit Cloud.")
+    st.stop()
+
 _auth = stauth.Authenticate(
-    credentials=dict(st.secrets.get("credentials", {})),
-    cookie_name=st.secrets.get("cookie", {}).get("name", "vigia_auth"),
-    cookie_key=st.secrets.get("cookie", {}).get("key", "vigia_key_2026"),
-    cookie_expiry_days=st.secrets.get("cookie", {}).get("expiry_days", 7),
+    credentials=_deep_dict(st.secrets['credentials']),
+    cookie_name=str(st.secrets['cookie']['name']),
+    cookie_key=str(st.secrets['cookie']['key']),
+    cookie_expiry_days=int(st.secrets['cookie']['expiry_days']),
     auto_hash=False,
 )
 _auth.login(
