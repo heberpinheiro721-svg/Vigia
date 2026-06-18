@@ -29,7 +29,7 @@ st.set_page_config(
     page_title="VIGIA — Análise de Investimentos",
     page_icon="🔍",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 PL_DEFAULT   = 2_107_321_289.97
