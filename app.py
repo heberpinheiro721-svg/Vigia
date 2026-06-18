@@ -524,8 +524,11 @@ if not st.session_state.get("authentication_status"):
                       font-size:2rem;margin-bottom:16px;">🔍</div>
           <div style="font-size:2.1rem;font-weight:900;color:#FFFFFF;
                       letter-spacing:-0.03em;line-height:1;">VIGIA</div>
-          <div style="font-size:0.68rem;color:#3A6A9A;letter-spacing:0.14em;
-                      text-transform:uppercase;margin-top:6px;">
+          <div style="font-size:0.72rem;color:#6A9AC0;letter-spacing:0.04em;
+                      margin-top:7px;font-style:italic;">
+              Vigilante de Investimentos e Gestão do IAJA</div>
+          <div style="font-size:0.62rem;color:#2A4A6A;letter-spacing:0.14em;
+                      text-transform:uppercase;margin-top:5px;">
               Análise de Investimentos · IAJA</div>
         </div>
         """, unsafe_allow_html=True)
