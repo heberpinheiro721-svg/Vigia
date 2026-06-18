@@ -167,6 +167,7 @@ def calcular_comparativo(
 
     ret['retorno_mes'] = (ret['quota_fim'] / ret['quota_ini'] - 1) * 100
     ret = ret[(ret['retorno_mes'] > -30) & (ret['retorno_mes'] < 50)]
+    ret = ret.merge(pl_medio.rename('pl_medio'), left_on='CNPJ_fmt', right_index=True, how='left')
 
     # Retorno anual: compara cota atual com cota do mesmo mês do ano anterior
     mes_ant = mes
