@@ -186,21 +186,16 @@ def calcular_comparativo(
 
 def resumo_por_classe(df_comp: pd.DataFrame) -> pd.DataFrame:
     """Agrega estatísticas de retorno por classe de fundo."""
-    def agg(g):
-        return pd.Series({
-            'qtd_fundos':  len(g),
-            'mediana':     round(g['retorno_mes'].median(), 4),
-            'media':       round(g['retorno_mes'].mean(),   4),
-            'p10':         round(g['retorno_mes'].quantile(0.10), 4),
-            'p25':         round(g['retorno_mes'].quantile(0.25), 4),
-            'p75':         round(g['retorno_mes'].quantile(0.75), 4),
-            'p90':         round(g['retorno_mes'].quantile(0.90), 4),
-            'pl_total_bi': round(g['pl_medio'].sum() / 1e9, 1),
-        })
-
-    return (
-        df_comp.groupby('Classe')
-        .apply(agg, include_groups=False)
-        .reset_index()
-        .sort_values('mediana', ascending=False)
-    )
+    g_ret = df_comp.groupby('Classe')['retorno_mes']
+    g_pl  = df_comp.groupby('Classe')['pl_medio']
+    result = pd.DataFrame({
+        'qtd_fundos':  g_ret.count(),
+        'mediana':     g_ret.median().round(4),
+        'media':       g_ret.mean().round(4),
+        'p10':         g_ret.quantile(0.10).round(4),
+        'p25':         g_ret.quantile(0.25).round(4),
+        'p75':         g_ret.quantile(0.75).round(4),
+        'p90':         g_ret.quantile(0.90).round(4),
+        'pl_total_bi': (g_pl.sum() / 1e9).round(1),
+    }).reset_index().sort_values('mediana', ascending=False)
+    return result
