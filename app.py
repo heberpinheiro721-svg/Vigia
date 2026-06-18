@@ -418,11 +418,12 @@ if 'chat_persona' not in st.session_state:
     st.session_state.chat_persona = 'vigia'
 if 'active_page' not in st.session_state:
     st.session_state.active_page = 'Dashboard'
-if 'sidebar_open' not in st.session_state:
-    st.session_state.sidebar_open = True
+if 'sidebar_just_opened' not in st.session_state:
+    st.session_state.sidebar_just_opened = False
 
-# ── CSS dinâmico da sidebar ───────────────────────────────────────────────────
-if st.session_state.sidebar_open:
+# ── CSS da sidebar ─────────────────────────────────────────────────────────────
+# Quando o botão Menu é clicado: força abertura por UM render (sem travar o «»)
+if st.session_state.sidebar_just_opened:
     st.markdown("""<style>
     section[data-testid="stSidebar"] {
         display: flex !important;
@@ -432,9 +433,10 @@ if st.session_state.sidebar_open:
     [data-testid="collapsedControl"],
     [data-testid="stSidebarCollapsedControl"] { display: none !important; }
     </style>""", unsafe_allow_html=True)
+    st.session_state.sidebar_just_opened = False  # libera para próximo render
 else:
+    # Esconde apenas o botão nativo (substituído pelo nosso ☰ Menu)
     st.markdown("""<style>
-    section[data-testid="stSidebar"] { display: none !important; }
     [data-testid="collapsedControl"],
     [data-testid="stSidebarCollapsedControl"] { display: none !important; }
     </style>""", unsafe_allow_html=True)
@@ -482,9 +484,6 @@ with st.sidebar:
       </div>
     </div>
     """, unsafe_allow_html=True)
-    if st.button("✕ Fechar", key="fechar_sidebar", use_container_width=True):
-        st.session_state.sidebar_open = False
-        st.rerun()
     st.markdown("---")
 
     # Navegação principal
@@ -698,12 +697,11 @@ if st.session_state.get('_nav_source') == 'sidebar':
     st.session_state['_mob_radio'] = _mob_label
     st.session_state['_nav_source'] = None
 
-# Barra superior: botão menu + módulo atual
+# Barra superior: botão Menu + módulo atual
 _col_menu, _col_mod = st.columns([1, 5])
 with _col_menu:
-    _menu_label = "☰ Menu" if not st.session_state.sidebar_open else "✕"
-    if st.button(_menu_label, key="toggle_sidebar", use_container_width=True):
-        st.session_state.sidebar_open = not st.session_state.sidebar_open
+    if st.button("☰ Menu", key="abrir_sidebar", use_container_width=True):
+        st.session_state.sidebar_just_opened = True
         st.rerun()
 with _col_mod:
     st.markdown(
