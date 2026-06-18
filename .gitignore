@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Ambiente virtual (fora do OneDrive)
+vigia_venv/
+venv/
+.venv/
+
+# Dados sensíveis e arquivos gerados
+data/
+reports/
+historico/
+
+# Cache do Streamlit e do app
+data/.cache/
+.cache/
+
+# Secrets (API keys, credenciais)
+.streamlit/secrets.toml
+*.env
+.env*
+
+# Logs e outputs temporários
+*.log
+st_out.txt
+st_err.txt
+streamlit_out.txt
+streamlit_err.txt
+VIGIA_Apresentacao.txt
+
+# Claude Code
+.claude/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Windows
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# PDF gerados
+*.pdf
