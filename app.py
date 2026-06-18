@@ -446,6 +446,8 @@ with st.sidebar:
     st.markdown("### ⚙️ Dados")
 
     uploaded = st.file_uploader("Upload CSV Composição", type=['csv'])
+    uploaded_bal = st.file_uploader("Upload PDF Balancete", type=['pdf'])
+    uploaded_cotas = st.file_uploader("Upload CSV Cotas", type=['csv'], key="cotas_upload")
     usar_local = st.checkbox("Usar arquivo local (data/Composição/)", value=True)
     data_ref = st.text_input("Data de referência", value=DATA_DEFAULT)
 
@@ -537,7 +539,13 @@ def _cached_compliance(path_str: str, mtime: float, pl: float, emprestimos: floa
 bal_dados = None
 extra_segmentos = {}
 pl = PL_DEFAULT
-bal_path = achar_balancete(data_dir)
+if uploaded_bal:
+    dest_bal = data_dir / "Balancete" / uploaded_bal.name
+    dest_bal.parent.mkdir(parents=True, exist_ok=True)
+    dest_bal.write_bytes(uploaded_bal.read())
+    bal_path = dest_bal
+else:
+    bal_path = achar_balancete(data_dir)
 if bal_path:
     try:
         bal_dados = _cached_balancete(str(bal_path), bal_path.stat().st_mtime)
@@ -583,7 +591,13 @@ engine = ComplianceEngine(carteira, pl, extra_segmentos=extra_segmentos)
 
 # 3. Cotas
 df_cotas = None
-cotas_path = achar_cotas_csv(data_dir)
+if uploaded_cotas:
+    dest_cotas = data_dir / "cotas" / uploaded_cotas.name
+    dest_cotas.parent.mkdir(parents=True, exist_ok=True)
+    dest_cotas.write_bytes(uploaded_cotas.read())
+    cotas_path = dest_cotas
+else:
+    cotas_path = achar_cotas_csv(data_dir)
 if cotas_path:
     try:
         df_cotas = _cached_cotas(str(cotas_path), cotas_path.stat().st_mtime)
