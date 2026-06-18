@@ -395,10 +395,37 @@ footer { visibility: hidden; }
         fill: #FFFFFF !important;
         stroke: #FFFFFF !important;
     }
-    /* Oculta o botão nativo do Streamlit para evitar conflito */
+    /* Botão nativo «/» sempre visível para fechar/abrir sidebar */
     [data-testid="collapsedControl"],
     [data-testid="stSidebarCollapsedControl"] {
-        display: none !important;
+        position: fixed !important;
+        bottom: 80px !important;
+        left: 12px !important;
+        top: auto !important;
+        width: 44px !important;
+        height: 44px !important;
+        background: #1B3A6B !important;
+        border-radius: 50% !important;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.35) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        z-index: 9999 !important;
+        opacity: 1 !important;
+    }
+    [data-testid="collapsedControl"] svg,
+    [data-testid="stSidebarCollapsedControl"] svg {
+        fill: #FFFFFF !important;
+        stroke: #FFFFFF !important;
+        width: 20px !important;
+        height: 20px !important;
+    }
+    [data-testid="collapsedControl"] button,
+    [data-testid="stSidebarCollapsedControl"] button {
+        width: 100% !important;
+        height: 100% !important;
+        background: transparent !important;
+        border: none !important;
     }
 }
 
@@ -415,8 +442,6 @@ footer { visibility: hidden; }
 """, unsafe_allow_html=True)
 
 # ── Session state ─────────────────────────────────────────────────────────────
-if 'sidebar_open' not in st.session_state:
-    st.session_state.sidebar_open = True
 if 'analise_ia' not in st.session_state:
     st.session_state.analise_ia = None
 if 'chat_historico' not in st.session_state:
@@ -459,24 +484,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Força sidebar aberta ou oculta via CSS ────────────────────────────────────
-if st.session_state.sidebar_open:
-    st.markdown("""
-    <style>
-    section[data-testid="stSidebar"] {
-        display: flex !important;
-        transform: translateX(0) !important;
-        min-width: 244px !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-else:
-    st.markdown("""
-    <style>
-    section[data-testid="stSidebar"] { display: none !important; }
-    </style>
-    """, unsafe_allow_html=True)
-
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
@@ -489,9 +496,6 @@ with st.sidebar:
       </div>
     </div>
     """, unsafe_allow_html=True)
-    if st.button("✕ Fechar menu", key="fechar_sidebar", use_container_width=True):
-        st.session_state.sidebar_open = False
-        st.rerun()
     st.markdown("---")
 
     # Navegação principal
@@ -705,23 +709,12 @@ if st.session_state.get('_nav_source') == 'sidebar':
     st.session_state['_mob_radio'] = _mob_label
     st.session_state['_nav_source'] = None
 
-# Expander de navegação + botão reabrir — só quando sidebar está fechada
-if not st.session_state.sidebar_open:
-    _col_btn, _col_nav = st.columns([1, 4])
-    with _col_btn:
-        if st.button("☰ Menu", key="abrir_sidebar", type="primary", use_container_width=True):
-            st.session_state.sidebar_open = True
-            st.rerun()
-    with _col_nav:
-        _mob_radio_idx = _mob_keys.index(st.session_state.get('_mob_radio', _mob_label))
-        with st.expander(f"{_mob_label}", expanded=False):
-            _mob_sel = st.radio("Módulo", _mob_keys, index=_mob_radio_idx,
-                                key="_mob_radio", label_visibility="collapsed",
-                                horizontal=False)
-            if MODULOS[_mob_sel] != st.session_state.active_page:
-                st.session_state.active_page = MODULOS[_mob_sel]
-                st.session_state['_nav_source'] = 'mobile'
-                st.rerun()
+# Indicador do módulo atual (só texto, não selecionável)
+st.markdown(
+    f'<p style="font-size:0.80rem;color:#6B8CAE;margin:0 0 6px 2px;">'
+    f'📍 {_mob_label}</p>',
+    unsafe_allow_html=True,
+)
 
 pagina = st.session_state.active_page
 
