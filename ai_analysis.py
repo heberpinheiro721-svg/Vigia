@@ -1,5 +1,26 @@
 from groq import Groq
 
+
+def _groq_call(messages: list, model: str, max_tokens: int,
+               temperature: float, api_keys) -> str:
+    """Tenta cada chave Groq em ordem; passa para a próxima em rate limit."""
+    keys = [api_keys] if isinstance(api_keys, str) else list(api_keys)
+    ultimo_erro = None
+    for key in keys:
+        try:
+            resp = Groq(api_key=key).chat.completions.create(
+                model=model, messages=messages,
+                max_tokens=max_tokens, temperature=temperature,
+            )
+            return resp.choices[0].message.content
+        except Exception as e:
+            msg = str(e).lower()
+            if 'rate' in msg or '429' in msg or 'quota' in msg:
+                ultimo_erro = e
+                continue
+            raise
+    raise ultimo_erro or RuntimeError("Todas as chaves Groq atingiram o limite")
+
 # ── Personas de investidores ──────────────────────────────────────────────────
 PERSONAS = {
     'vigia': {
@@ -171,19 +192,12 @@ _SISTEMAS = {
 def chat_persona(
     mensagens: list[dict],
     contexto: dict,
-    api_key: str,
+    api_key,
     persona_key: str = 'vigia',
 ) -> str:
-    client = Groq(api_key=api_key)
     fn = _SISTEMAS.get(persona_key, _sistema_vigia)
     messages_api = [{'role': 'system', 'content': fn(contexto)}] + mensagens
-    response = client.chat.completions.create(
-        model='llama-3.3-70b-versatile',
-        messages=messages_api,
-        max_tokens=900,
-        temperature=0.3,
-    )
-    return response.choices[0].message.content
+    return _groq_call(messages_api, 'llama-3.3-70b-versatile', 900, 0.3, api_key)
 
 
 def chat_vigia(
@@ -194,8 +208,7 @@ def chat_vigia(
     return chat_persona(mensagens, contexto, api_key, persona_key='vigia')
 
 
-def gerar_analise_completa_pdf(contexto: dict, api_key: str) -> str:
-    client = Groq(api_key=api_key)
+def gerar_analise_completa_pdf(contexto: dict, api_key) -> str:
 
     prompt = f"""Você é VIGIA, sistema especializado de análise de investimentos do IAJA
 (Instituto Adventista de Jubilação e Assistência), EFPC supervisionada pela PREVIC.
@@ -249,17 +262,11 @@ dados analisados. Inclua ações de curto prazo e considerações estratégicas 
 Use linguagem técnica, objetiva e formal. Seja preciso com todos os números do contexto.
 Extensão: 500 a 700 palavras."""
 
-    response = client.chat.completions.create(
-        model='llama-3.3-70b-versatile',
-        messages=[{'role': 'user', 'content': prompt}],
-        max_tokens=1800,
-        temperature=0.2,
-    )
-    return response.choices[0].message.content
+    return _groq_call([{'role': 'user', 'content': prompt}],
+                      'llama-3.3-70b-versatile', 1800, 0.2, api_key)
 
 
-def gerar_briefing_diario(contexto: dict, api_key: str) -> str:
-    client = Groq(api_key=api_key)
+def gerar_briefing_diario(contexto: dict, api_key) -> str:
 
     prompt = f"""Você é VIGIA, assistente de investimentos do IAJA (EFPC supervisionada pela PREVIC).
 Prepare o briefing diário para o gestor de investimentos.
@@ -306,22 +313,16 @@ REGRAS:
 - Use os números exatos do contexto.
 - Tom analítico, direto e profissional. Máximo 220 palavras."""
 
-    response = client.chat.completions.create(
-        model='llama-3.3-70b-versatile',
-        messages=[{'role': 'user', 'content': prompt}],
-        max_tokens=450,
-        temperature=0.25,
-    )
-    return response.choices[0].message.content
+    return _groq_call([{'role': 'user', 'content': prompt}],
+                      'llama-3.3-70b-versatile', 450, 0.25, api_key)
 
 
 def gerar_analise_compliance(
     resumo: list[dict],
     pl: float,
     data_ref: str,
-    api_key: str,
+    api_key,
 ) -> str:
-    client = Groq(api_key=api_key)
 
     criticos  = [r for r in resumo if r['status'] == 'vermelho']
     atencao   = [r for r in resumo if r['status'] == 'amarelo']
@@ -366,10 +367,5 @@ Forneça em português formal:
 
 Seja direto e técnico. Linguagem adequada ao Conselho Deliberativo de uma EFPC."""
 
-    response = client.chat.completions.create(
-        model='llama-3.3-70b-versatile',
-        messages=[{'role': 'user', 'content': prompt}],
-        max_tokens=1500,
-        temperature=0.3,
-    )
-    return response.choices[0].message.content
+    return _groq_call([{'role': 'user', 'content': prompt}],
+                      'llama-3.3-70b-versatile', 1500, 0.3, api_key)

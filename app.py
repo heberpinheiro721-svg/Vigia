@@ -592,7 +592,11 @@ with st.sidebar:
     usar_local = st.checkbox("Usar arquivo local (data/Composição/)", value=True)
     data_ref = st.text_input("Data de referência", value=DATA_DEFAULT)
 
-    api_key = st.secrets.get("GROQ_API_KEY", "") if hasattr(st, "secrets") else ""
+    _raw_keys = st.secrets.get("GROQ_API_KEYS", None) if hasattr(st, "secrets") else None
+    if _raw_keys:
+        api_key = list(_raw_keys)
+    else:
+        api_key = st.secrets.get("GROQ_API_KEY", "") if hasattr(st, "secrets") else ""
 
     st.divider()
     _auth.logout(button_name="🚪 Sair", location="sidebar")
