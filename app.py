@@ -459,8 +459,18 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Oculta sidebar via CSS quando fechada pelo nosso toggle ──────────────────
-if not st.session_state.sidebar_open:
+# ── Força sidebar aberta ou oculta via CSS ────────────────────────────────────
+if st.session_state.sidebar_open:
+    st.markdown("""
+    <style>
+    section[data-testid="stSidebar"] {
+        display: flex !important;
+        transform: translateX(0) !important;
+        min-width: 244px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+else:
     st.markdown("""
     <style>
     section[data-testid="stSidebar"] { display: none !important; }
@@ -695,21 +705,23 @@ if st.session_state.get('_nav_source') == 'sidebar':
     st.session_state['_mob_radio'] = _mob_label
     st.session_state['_nav_source'] = None
 
-# Botão para reabrir a sidebar (aparece quando ela está fechada)
+# Expander de navegação + botão reabrir — só quando sidebar está fechada
 if not st.session_state.sidebar_open:
-    if st.button("☰ Abrir menu", key="abrir_sidebar", type="primary", use_container_width=True):
-        st.session_state.sidebar_open = True
-        st.rerun()
-
-_mob_radio_idx = _mob_keys.index(st.session_state.get('_mob_radio', _mob_label))
-with st.expander(f"☰  {_mob_label}", expanded=False):
-    _mob_sel = st.radio("Módulo", _mob_keys, index=_mob_radio_idx,
-                        key="_mob_radio", label_visibility="collapsed",
-                        horizontal=False)
-    if MODULOS[_mob_sel] != st.session_state.active_page:
-        st.session_state.active_page = MODULOS[_mob_sel]
-        st.session_state['_nav_source'] = 'mobile'
-        st.rerun()
+    _col_btn, _col_nav = st.columns([1, 4])
+    with _col_btn:
+        if st.button("☰ Menu", key="abrir_sidebar", type="primary", use_container_width=True):
+            st.session_state.sidebar_open = True
+            st.rerun()
+    with _col_nav:
+        _mob_radio_idx = _mob_keys.index(st.session_state.get('_mob_radio', _mob_label))
+        with st.expander(f"{_mob_label}", expanded=False):
+            _mob_sel = st.radio("Módulo", _mob_keys, index=_mob_radio_idx,
+                                key="_mob_radio", label_visibility="collapsed",
+                                horizontal=False)
+            if MODULOS[_mob_sel] != st.session_state.active_page:
+                st.session_state.active_page = MODULOS[_mob_sel]
+                st.session_state['_nav_source'] = 'mobile'
+                st.rerun()
 
 pagina = st.session_state.active_page
 
