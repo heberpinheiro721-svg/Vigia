@@ -844,6 +844,102 @@ if pagina == 'Dashboard':
               ">80% do limite" if a_cnt else "Nenhum",
               delta_color="inverse" if a_cnt else "off")
 
+    # ── Saúde da Carteira ─────────────────────────────────────────────────────
+    # Compliance (40 pts): verde=1.0, amarelo=0.5, vermelho=0.0 por segmento
+    pts_comp = (sum({'verde':1.0,'amarelo':0.5,'vermelho':0.0}.get(s['status'],0)
+                    for s in resumo) / total_segs * 40) if total_segs else 40.0
+
+    # Risco/Concentração (20 pts): menor uso dos limites = mais seguro
+    _usos = [s.get('pct_limite', 0) for s in resumo if s.get('valor', 0) > 0]
+    pts_risco = max(0.0, 20.0 * (1 - (sum(_usos) / len(_usos) if _usos else 0)))
+
+    # Performance vs meta atuarial (40 pts)
+    if df_cotas is not None:
+        _meta_s = calcular_meta_atuarial(
+            df_cotas, b.get('inpc_mes', 0.0), b.get('inpc_ano', 0.0),
+            b['cdi_mes'], b['cdi_ano'],
+        )
+        _pl_s = _meta_s['planos']
+        if not _pl_s.empty:
+            _scores = [1.0 if r['Δ Ano (%)'] >= 0 else (0.5 if r['Δ Ano (%)'] >= -2 else 0.0)
+                       for _, r in _pl_s.iterrows()]
+            pts_perf = sum(_scores) / len(_scores) * 40
+        else:
+            pts_perf = 20.0
+    else:
+        pts_perf = 20.0
+
+    saude = max(0, min(100, round(pts_comp + pts_risco + pts_perf)))
+
+    if saude >= 85:
+        _sl, _sc, _sbg = "Excelente", "#1A7A40", "#E8F8F1"
+    elif saude >= 70:
+        _sl, _sc, _sbg = "Bom",       "#2472B5", "#EBF5FB"
+    elif saude >= 50:
+        _sl, _sc, _sbg = "Atenção",   "#9A6B00", "#FEF9E7"
+    elif saude >= 30:
+        _sl, _sc, _sbg = "Alerta",    "#E67E22", "#FEF0E7"
+    else:
+        _sl, _sc, _sbg = "Crítico",   "#C0392B", "#FDE8E8"
+
+    _bar_w   = saude
+    _sub_comp  = round(pts_comp)
+    _sub_perf  = round(pts_perf)
+    _sub_risco = round(pts_risco)
+
+    def _cor_sub(v, mx):
+        p = v / mx * 100
+        return "#27AE60" if p >= 75 else ("#E67E22" if p >= 40 else "#E74C3C")
+
+    st.markdown(f"""
+    <div style="background:{_sbg};border:1px solid {_sc}33;border-left:4px solid {_sc};
+                border-radius:12px;padding:14px 20px;margin:10px 0 18px 0;">
+      <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+
+        <!-- Score -->
+        <div style="min-width:80px;text-align:center;">
+          <div style="font-size:2.8rem;font-weight:900;color:{_sc};line-height:1;">{saude}</div>
+          <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.08em;
+                      text-transform:uppercase;color:{_sc};opacity:0.75;">/ 100</div>
+        </div>
+
+        <!-- Barra + label -->
+        <div style="flex:1;min-width:180px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+            <div style="font-size:1.0rem;font-weight:800;color:{_sc};">Saúde da Carteira</div>
+            <div style="font-size:0.85rem;font-weight:700;color:{_sc};">{_sl}</div>
+          </div>
+          <div style="background:rgba(0,0,0,0.10);border-radius:99px;height:10px;overflow:hidden;">
+            <div style="width:{_bar_w}%;height:100%;background:{_sc};border-radius:99px;
+                        transition:width 0.6s ease;"></div>
+          </div>
+          <!-- Sub-scores -->
+          <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
+            <div style="background:rgba(0,0,0,0.06);border-radius:8px;padding:5px 10px;text-align:center;">
+              <div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;
+                          letter-spacing:0.05em;">Compliance</div>
+              <div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_comp,40)};">
+                {_sub_comp}<span style="font-size:0.65rem;color:#8AAECB;">/40</span></div>
+            </div>
+            <div style="background:rgba(0,0,0,0.06);border-radius:8px;padding:5px 10px;text-align:center;">
+              <div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;
+                          letter-spacing:0.05em;">Performance</div>
+              <div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_perf,40)};">
+                {_sub_perf}<span style="font-size:0.65rem;color:#8AAECB;">/40</span></div>
+            </div>
+            <div style="background:rgba(0,0,0,0.06);border-radius:8px;padding:5px 10px;text-align:center;">
+              <div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;
+                          letter-spacing:0.05em;">Risco</div>
+              <div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_risco,20)};">
+                {_sub_risco}<span style="font-size:0.65rem;color:#8AAECB;">/20</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
     # ══════════════════════════════════════════════════════════════════════════
     # LINHA 2: Alocação | Meta Atuarial | Benchmarks
     # ══════════════════════════════════════════════════════════════════════════
