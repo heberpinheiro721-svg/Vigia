@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as st_components
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
@@ -683,6 +684,26 @@ if st.session_state.get('_mob_nav') != _mob_label:
     st.session_state['_mob_nav'] = _mob_label
 st.markdown('<div class="mobile-nav-wrap">', unsafe_allow_html=True)
 _mob_sel = st.selectbox("Módulo", _mob_keys, key="_mob_nav", label_visibility="collapsed")
+st_components.html("""
+<script>
+(function() {
+    function noKeyboard() {
+        try {
+            var inputs = window.parent.document.querySelectorAll('.mobile-nav-wrap input');
+            inputs.forEach(function(el) {
+                el.setAttribute('readonly', '');
+                el.setAttribute('inputmode', 'none');
+            });
+        } catch(e) {}
+    }
+    noKeyboard();
+    setTimeout(noKeyboard, 400);
+    setTimeout(noKeyboard, 1200);
+    var obs = new MutationObserver(noKeyboard);
+    try { obs.observe(window.parent.document.body, {childList:true, subtree:true}); } catch(e) {}
+})();
+</script>
+""", height=0, scrolling=False)
 st.markdown('</div>', unsafe_allow_html=True)
 if MODULOS[_mob_sel] != st.session_state.active_page:
     st.session_state.active_page = MODULOS[_mob_sel]
