@@ -1820,7 +1820,7 @@ elif pagina == 'Simulador':
         return ''
 
     st.dataframe(
-        df_rel.style.applymap(_colorir, subset=['Δ Alocação', 'Δ Contribuição']),
+        df_rel.style.map(_colorir, subset=['Δ Alocação', 'Δ Contribuição']),
         use_container_width=True,
     )
 
