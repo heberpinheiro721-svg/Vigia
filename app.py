@@ -274,6 +274,13 @@ footer { visibility: hidden; }
         border-bottom: 2px solid #1B3A6B !important;
         margin-bottom: 10px !important;
     }
+    /* Impede digitação no selectbox mobile — só touch/clique */
+    .mobile-nav-wrap input {
+        pointer-events: none !important;
+        caret-color: transparent !important;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+    }
 }
 
 /* ── Mobile ── */
