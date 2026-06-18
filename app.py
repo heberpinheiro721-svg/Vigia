@@ -844,43 +844,64 @@ if pagina == 'Dashboard':
               ">80% do limite" if a_cnt else "Nenhum",
               delta_color="inverse" if a_cnt else "off")
 
-    # ── Saúde da Carteira ─────────────────────────────────────────────────────
-    # Foco: desempenho dos fundos e meta atuarial
-    # Meta Atuarial (50 pts) + Rentabilidade vs CDI (30 pts) + Compliance guardrail (20 pts)
+    # ── Saúde da Carteira — Visão de Longo Prazo ─────────────────────────────
+    # 60 pts: Acumulado histórico vs meta acumulada (Total_pct do CSV)
+    # 25 pts: Aderência à meta no ano corrente (Δ Ano)
+    # 15 pts: Tendência (mês atual vs média mensal do ano)
+    _SPREADS_LP  = {'PL Alpha': 5.24, 'PL Beta': 4.50, 'PL Gama': 4.50}
+    _inpc_mes_lp = b.get('inpc_mes', 0.0)
+    _inpc_ano_lp = b.get('inpc_ano', 0.0)
 
     if df_cotas is not None:
-        _meta_s = calcular_meta_atuarial(
-            df_cotas, b.get('inpc_mes', 0.0), b.get('inpc_ano', 0.0),
-            b['cdi_mes'], b['cdi_ano'],
+        _ult_pos = ultima_posicao(df_cotas)
+        _pl_lp   = _ult_pos[_ult_pos['fundo'].isin(_SPREADS_LP.keys())]
+
+        # 1. Acumulado histórico vs meta acumulada (60 pts)
+        # Total_pct = retorno acumulado desde o início do CSV histórico
+        # n_anos estimado via Total_pct / meta_anual (proxy razoável)
+        _acum_sc = []
+        for _, r in _pl_lp.iterrows():
+            total_pct = r.get('Total_pct', 0.0)
+            spread    = _SPREADS_LP.get(r['fundo'], 4.75)
+            meta_aa   = _inpc_ano_lp + spread
+            n_anos    = max(1.0, min(10.0, abs(total_pct) / max(meta_aa, 0.5)))
+            meta_acum = ((1 + meta_aa / 100) ** n_anos - 1) * 100
+            delta_ac  = total_pct - meta_acum
+            # Δ ≥ 0 → 1.0 | Δ = -10pp → 0.0
+            _acum_sc.append(max(0.0, min(1.0, (delta_ac + 10) / 10)))
+        pts_acum = sum(_acum_sc) / len(_acum_sc) * 60 if _acum_sc else 30.0
+
+        # 2. Aderência à meta no ano corrente (25 pts)
+        # Δ Ano ≥ 0 → 1.0 | Δ Ano = -5pp → 0.0
+        _meta_lp = calcular_meta_atuarial(
+            df_cotas, _inpc_mes_lp, _inpc_ano_lp, b['cdi_mes'], b['cdi_ano'],
         )
-        _pl_s = _meta_s['planos']
+        _pls_lp = _meta_lp['planos']
+        if not _pls_lp.empty:
+            _ano_sc = [max(0.0, min(1.0, (r['Δ Ano (%)'] + 5) / 5))
+                       for _, r in _pls_lp.iterrows()]
+            pts_ano = sum(_ano_sc) / len(_ano_sc) * 25
+        else:
+            pts_ano = 12.5
+
+        # 3. Tendência — mês atual vs média mensal do ano (15 pts)
+        # Positivo: acelerando. Negativo: desacelerando.
+        _tend_sc = []
+        _n_meses = _ult_pos['Data'].max().month if not _ult_pos.empty else 3
+        for _, r in _pl_lp.iterrows():
+            mes = r.get('Mês_pct', 0.0)
+            ano = r.get('Ano_pct', 0.0)
+            media_mensal = ano / max(_n_meses, 1)
+            delta_t = mes - media_mensal
+            # delta_t ≥ +1.5pp → 1.0 | delta_t ≤ -1.5pp → 0.0
+            _tend_sc.append(max(0.0, min(1.0, (delta_t + 1.5) / 3.0)))
+        pts_tend = sum(_tend_sc) / len(_tend_sc) * 15 if _tend_sc else 7.5
     else:
-        _pl_s = None
+        pts_acum = 30.0
+        pts_ano  = 12.5
+        pts_tend = 7.5
 
-    # 1. Meta Atuarial (50 pts) — quão próximo cada plano está da sua meta no ano
-    #    Δ Ano ≥ 0%  → 1.0 | Δ Ano = -5pp → 0.0  (escala contínua)
-    if _pl_s is not None and not _pl_s.empty:
-        _meta_scores = [max(0.0, min(1.0, (r['Δ Ano (%)'] + 5) / 5))
-                        for _, r in _pl_s.iterrows()]
-        pts_meta = sum(_meta_scores) / len(_meta_scores) * 50
-    else:
-        pts_meta = 25.0  # neutro sem dados
-
-    # 2. Rentabilidade vs CDI (30 pts) — retorno ano de cada plano vs CDI ano
-    #    retorno ≥ CDI → 1.0 | retorno = CDI - 5pp → 0.0
-    cdi_ano = b.get('cdi_ano', 0.0)
-    if _pl_s is not None and not _pl_s.empty:
-        _cdi_scores = [max(0.0, min(1.0, (r['Retorno Ano (%)'] - cdi_ano + 5) / 5))
-                       for _, r in _pl_s.iterrows()]
-        pts_cdi = sum(_cdi_scores) / len(_cdi_scores) * 30
-    else:
-        pts_cdi = 15.0  # neutro sem dados
-
-    # 3. Compliance CMN (20 pts) — guardrail regulatório
-    pts_comp = (sum({'verde':1.0,'amarelo':0.5,'vermelho':0.0}.get(s['status'],0)
-                    for s in resumo) / total_segs * 20) if total_segs else 20.0
-
-    saude = max(0, min(100, round(pts_meta + pts_cdi + pts_comp)))
+    saude = max(0, min(100, round(pts_acum + pts_ano + pts_tend)))
 
     if saude >= 85:
         _sl, _sc, _sbg = "Excelente", "#1A7A40", "#E8F8F1"
@@ -894,9 +915,9 @@ if pagina == 'Dashboard':
         _sl, _sc, _sbg = "Crítico",   "#C0392B", "#FDE8E8"
 
     _bar_w     = saude
-    _sub_meta  = round(pts_meta)
-    _sub_cdi   = round(pts_cdi)
-    _sub_comp  = round(pts_comp)
+    _sub_acum  = round(pts_acum)
+    _sub_ano   = round(pts_ano)
+    _sub_tend  = round(pts_tend)
 
     def _cor_sub(v, mx):
         p = v / mx * 100
@@ -921,17 +942,17 @@ if pagina == 'Dashboard':
         f'</div>'
         f'<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">'
         f'<div style="background:rgba(0,0,0,0.06);border-radius:8px;padding:5px 10px;text-align:center;">'
-        f'<div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;">Meta Atuarial</div>'
-        f'<div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_meta,50)};">'
-        f'{_sub_meta}<span style="font-size:0.65rem;color:#8AAECB;">/50</span></div></div>'
+        f'<div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;">Acumulado</div>'
+        f'<div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_acum,60)};">'
+        f'{_sub_acum}<span style="font-size:0.65rem;color:#8AAECB;">/60</span></div></div>'
         f'<div style="background:rgba(0,0,0,0.06);border-radius:8px;padding:5px 10px;text-align:center;">'
-        f'<div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;">vs CDI</div>'
-        f'<div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_cdi,30)};">'
-        f'{_sub_cdi}<span style="font-size:0.65rem;color:#8AAECB;">/30</span></div></div>'
+        f'<div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;">Meta 2026</div>'
+        f'<div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_ano,25)};">'
+        f'{_sub_ano}<span style="font-size:0.65rem;color:#8AAECB;">/25</span></div></div>'
         f'<div style="background:rgba(0,0,0,0.06);border-radius:8px;padding:5px 10px;text-align:center;">'
-        f'<div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;">Compliance</div>'
-        f'<div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_comp,20)};">'
-        f'{_sub_comp}<span style="font-size:0.65rem;color:#8AAECB;">/20</span></div></div>'
+        f'<div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;">Tendência</div>'
+        f'<div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_tend,15)};">'
+        f'{_sub_tend}<span style="font-size:0.65rem;color:#8AAECB;">/15</span></div></div>'
         f'</div></div></div></div>',
         unsafe_allow_html=True,
     )
