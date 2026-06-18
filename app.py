@@ -395,36 +395,10 @@ footer { visibility: hidden; }
         fill: #FFFFFF !important;
         stroke: #FFFFFF !important;
     }
-    /* Botão para reabrir a sidebar — FAB flutuante visível */
-    [data-testid="collapsedControl"] {
-        position: fixed !important;
-        bottom: 90px !important;
-        left: 16px !important;
-        top: auto !important;
-        width: 56px !important;
-        height: 56px !important;
-        background: #1B3A6B !important;
-        border-radius: 50% !important;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.40) !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        z-index: 9999 !important;
-    }
-    [data-testid="collapsedControl"] button {
-        width: 100% !important;
-        height: 100% !important;
-        background: transparent !important;
-        border: none !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-    }
-    [data-testid="collapsedControl"] svg {
-        fill: #FFFFFF !important;
-        stroke: #FFFFFF !important;
-        width: 26px !important;
-        height: 26px !important;
+    /* Oculta o botão nativo do Streamlit para evitar conflito */
+    [data-testid="collapsedControl"],
+    [data-testid="stSidebarCollapsedControl"] {
+        display: none !important;
     }
 }
 
@@ -438,27 +412,11 @@ footer { visibility: hidden; }
     .vigia-header-sub { display: none !important; }
 }
 </style>
-<script>
-(function() {
-    /* Abre a sidebar automaticamente ao carregar no mobile */
-    function abrirSidebar() {
-        var sidebar = document.querySelector('[data-testid="stSidebar"]');
-        if (!sidebar) return;
-        var expandido = sidebar.getAttribute('aria-expanded');
-        if (expandido === 'false') {
-            var btn = document.querySelector('[data-testid="collapsedControl"] button');
-            if (btn) { btn.click(); }
-        }
-    }
-    if (window.innerWidth <= 768) {
-        setTimeout(abrirSidebar, 600);
-        setTimeout(abrirSidebar, 1500);
-    }
-})();
-</script>
 """, unsafe_allow_html=True)
 
 # ── Session state ─────────────────────────────────────────────────────────────
+if 'sidebar_open' not in st.session_state:
+    st.session_state.sidebar_open = True
 if 'analise_ia' not in st.session_state:
     st.session_state.analise_ia = None
 if 'chat_historico' not in st.session_state:
@@ -501,6 +459,14 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# ── Oculta sidebar via CSS quando fechada pelo nosso toggle ──────────────────
+if not st.session_state.sidebar_open:
+    st.markdown("""
+    <style>
+    section[data-testid="stSidebar"] { display: none !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
@@ -513,6 +479,9 @@ with st.sidebar:
       </div>
     </div>
     """, unsafe_allow_html=True)
+    if st.button("✕ Fechar menu", key="fechar_sidebar", use_container_width=True):
+        st.session_state.sidebar_open = False
+        st.rerun()
     st.markdown("---")
 
     # Navegação principal
@@ -725,6 +694,12 @@ _mob_label = _mob_keys[_mob_vals.index(st.session_state.active_page)] if st.sess
 if st.session_state.get('_nav_source') == 'sidebar':
     st.session_state['_mob_radio'] = _mob_label
     st.session_state['_nav_source'] = None
+
+# Botão para reabrir a sidebar (aparece quando ela está fechada)
+if not st.session_state.sidebar_open:
+    if st.button("☰ Abrir menu", key="abrir_sidebar", type="primary", use_container_width=True):
+        st.session_state.sidebar_open = True
+        st.rerun()
 
 _mob_radio_idx = _mob_keys.index(st.session_state.get('_mob_radio', _mob_label))
 with st.expander(f"☰  {_mob_label}", expanded=False):
