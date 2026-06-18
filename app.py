@@ -395,38 +395,6 @@ footer { visibility: hidden; }
         fill: #FFFFFF !important;
         stroke: #FFFFFF !important;
     }
-    /* Botão nativo «/» sempre visível para fechar/abrir sidebar */
-    [data-testid="collapsedControl"],
-    [data-testid="stSidebarCollapsedControl"] {
-        position: fixed !important;
-        bottom: 80px !important;
-        left: 12px !important;
-        top: auto !important;
-        width: 44px !important;
-        height: 44px !important;
-        background: #1B3A6B !important;
-        border-radius: 50% !important;
-        box-shadow: 0 3px 10px rgba(0,0,0,0.35) !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        z-index: 9999 !important;
-        opacity: 1 !important;
-    }
-    [data-testid="collapsedControl"] svg,
-    [data-testid="stSidebarCollapsedControl"] svg {
-        fill: #FFFFFF !important;
-        stroke: #FFFFFF !important;
-        width: 20px !important;
-        height: 20px !important;
-    }
-    [data-testid="collapsedControl"] button,
-    [data-testid="stSidebarCollapsedControl"] button {
-        width: 100% !important;
-        height: 100% !important;
-        background: transparent !important;
-        border: none !important;
-    }
 }
 
 @media screen and (max-width: 480px) {
@@ -450,6 +418,26 @@ if 'chat_persona' not in st.session_state:
     st.session_state.chat_persona = 'vigia'
 if 'active_page' not in st.session_state:
     st.session_state.active_page = 'Dashboard'
+if 'sidebar_open' not in st.session_state:
+    st.session_state.sidebar_open = True
+
+# ── CSS dinâmico da sidebar ───────────────────────────────────────────────────
+if st.session_state.sidebar_open:
+    st.markdown("""<style>
+    section[data-testid="stSidebar"] {
+        display: flex !important;
+        transform: translateX(0) !important;
+        min-width: 244px !important;
+    }
+    [data-testid="collapsedControl"],
+    [data-testid="stSidebarCollapsedControl"] { display: none !important; }
+    </style>""", unsafe_allow_html=True)
+else:
+    st.markdown("""<style>
+    section[data-testid="stSidebar"] { display: none !important; }
+    [data-testid="collapsedControl"],
+    [data-testid="stSidebarCollapsedControl"] { display: none !important; }
+    </style>""", unsafe_allow_html=True)
 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -487,15 +475,16 @@ st.markdown("""
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
-    <div style="padding:4px 0 12px 0;">
-      <div style="font-size:1.35rem;font-weight:800;color:#FFFFFF;letter-spacing:-0.02em;">
-        🔍 VIGIA
-      </div>
-      <div style="font-size:0.68rem;color:#5A88B5;margin-top:2px;letter-spacing:0.04em;">
-        ANÁLISE DE INVESTIMENTOS
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0 12px 0;">
+      <div>
+        <div style="font-size:1.35rem;font-weight:800;color:#FFFFFF;letter-spacing:-0.02em;">🔍 VIGIA</div>
+        <div style="font-size:0.68rem;color:#5A88B5;margin-top:2px;letter-spacing:0.04em;">ANÁLISE DE INVESTIMENTOS</div>
       </div>
     </div>
     """, unsafe_allow_html=True)
+    if st.button("✕ Fechar", key="fechar_sidebar", use_container_width=True):
+        st.session_state.sidebar_open = False
+        st.rerun()
     st.markdown("---")
 
     # Navegação principal
@@ -709,12 +698,19 @@ if st.session_state.get('_nav_source') == 'sidebar':
     st.session_state['_mob_radio'] = _mob_label
     st.session_state['_nav_source'] = None
 
-# Indicador do módulo atual (só texto, não selecionável)
-st.markdown(
-    f'<p style="font-size:0.80rem;color:#6B8CAE;margin:0 0 6px 2px;">'
-    f'📍 {_mob_label}</p>',
-    unsafe_allow_html=True,
-)
+# Barra superior: botão menu + módulo atual
+_col_menu, _col_mod = st.columns([1, 5])
+with _col_menu:
+    _menu_label = "☰ Menu" if not st.session_state.sidebar_open else "✕"
+    if st.button(_menu_label, key="toggle_sidebar", use_container_width=True):
+        st.session_state.sidebar_open = not st.session_state.sidebar_open
+        st.rerun()
+with _col_mod:
+    st.markdown(
+        f'<p style="font-size:0.85rem;color:#4A6A8A;margin:6px 0 0 4px;font-weight:500;">'
+        f'{_mob_label}</p>',
+        unsafe_allow_html=True,
+    )
 
 pagina = st.session_state.active_page
 
