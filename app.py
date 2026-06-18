@@ -1,5 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as st_components
+import streamlit_authenticator as stauth
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
@@ -441,6 +442,25 @@ footer { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
 
+# ── Autenticação ──────────────────────────────────────────────────────────────
+_auth = stauth.Authenticate(
+    credentials=dict(st.secrets.get("credentials", {})),
+    cookie_name=st.secrets.get("cookie", {}).get("name", "vigia_auth"),
+    cookie_key=st.secrets.get("cookie", {}).get("key", "vigia_key_2026"),
+    cookie_expiry_days=st.secrets.get("cookie", {}).get("expiry_days", 7),
+    auto_hash=False,
+)
+_auth.login(
+    location="main",
+    single_session=False,
+    fields={"Form name": "🔍 VIGIA — Acesso Restrito",
+            "Username": "Usuário", "Password": "Senha", "Login": "Entrar"},
+)
+if not st.session_state.get("authentication_status"):
+    if st.session_state.get("authentication_status") is False:
+        st.error("Usuário ou senha incorretos.")
+    st.stop()
+
 # ── Session state ─────────────────────────────────────────────────────────────
 if 'analise_ia' not in st.session_state:
     st.session_state.analise_ia = None
@@ -565,6 +585,7 @@ with st.sidebar:
     api_key = st.secrets.get("GROQ_API_KEY", "") if hasattr(st, "secrets") else ""
 
     st.divider()
+    _auth.logout(button_name="🚪 Sair", location="sidebar")
     st.caption("IAJA · PREVIC · Res. CMN 4.994/2022")
 
 # ── Carrega dados ─────────────────────────────────────────────────────────────
