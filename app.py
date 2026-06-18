@@ -1769,7 +1769,7 @@ elif pagina == 'Chat':
 
     # ── Seleção de persona ──────────────────────────────────────────────────
     st.markdown("##### Escolha com quem você quer conversar")
-    persona_cols = st.columns(4)
+    persona_cols = st.columns(len(PERSONAS))
     for idx, (pkey, pdata) in enumerate(PERSONAS.items()):
         is_sel = st.session_state.chat_persona == pkey
         borda = f"3px solid {pdata['cor']}" if is_sel else "1px solid #E2E9F2"
