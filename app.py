@@ -262,11 +262,36 @@ footer { visibility: hidden; }
 [data-testid="stToolbar"] { display: none !important; }
 [data-testid="stDecoration"] { display: none !important; }
 
-/* Botão nativo do Streamlit para reabrir a sidebar */
+/* Botão nativo do Streamlit para reabrir a sidebar — estilizado como "Menu" */
 [data-testid="collapsedControl"],
 [data-testid="stSidebarCollapsedControl"] {
-    opacity: 0 !important;   /* invisível mas clicável pelo JS */
-    pointer-events: none !important;
+    background: #1B3A6B !important;
+    border-radius: 8px !important;
+    padding: 4px 14px 4px 10px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25) !important;
+}
+[data-testid="collapsedControl"] button,
+[data-testid="stSidebarCollapsedControl"] button {
+    background: transparent !important;
+    border: none !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    color: #FFFFFF !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    padding: 6px 4px !important;
+}
+[data-testid="collapsedControl"] button::after,
+[data-testid="stSidebarCollapsedControl"] button::after {
+    content: "Menu" !important;
+    color: #FFFFFF !important;
+}
+[data-testid="collapsedControl"] svg,
+[data-testid="stSidebarCollapsedControl"] svg {
+    fill: #FFFFFF !important;
+    width: 18px !important;
+    height: 18px !important;
 }
 
 /* Navegação mobile — radio escondido no desktop */
@@ -425,37 +450,6 @@ if 'chat_persona' not in st.session_state:
     st.session_state.chat_persona = 'vigia'
 if 'active_page' not in st.session_state:
     st.session_state.active_page = 'Dashboard'
-if 'sidebar_just_opened' not in st.session_state:
-    st.session_state.sidebar_just_opened = False
-
-# ── Abre sidebar via JS quando botão Menu é clicado ───────────────────────────
-# Clica no botão nativo do Streamlit — sem CSS de transform (não bloqueia «»)
-if st.session_state.sidebar_just_opened:
-    st_components.html("""
-    <script>
-    (function() {
-        function openSidebar() {
-            try {
-                var doc = window.parent.document;
-                var selectors = [
-                    '[data-testid="collapsedControl"] button',
-                    '[data-testid="stSidebarCollapsedControl"] button',
-                    'button[aria-label="Open sidebar"]',
-                    'button[aria-label="Abrir barra lateral"]'
-                ];
-                for (var i = 0; i < selectors.length; i++) {
-                    var el = doc.querySelector(selectors[i]);
-                    if (el) { el.click(); return true; }
-                }
-            } catch(e) {}
-            return false;
-        }
-        if (!openSidebar()) { setTimeout(openSidebar, 300); }
-        setTimeout(openSidebar, 700);
-    })();
-    </script>
-    """, height=1, scrolling=False)
-    st.session_state.sidebar_just_opened = False
 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -713,18 +707,12 @@ if st.session_state.get('_nav_source') == 'sidebar':
     st.session_state['_mob_radio'] = _mob_label
     st.session_state['_nav_source'] = None
 
-# Barra superior: botão Menu + módulo atual
-_col_menu, _col_mod = st.columns([1, 5])
-with _col_menu:
-    if st.button("☰ Menu", key="abrir_sidebar", use_container_width=True):
-        st.session_state.sidebar_just_opened = True
-        st.rerun()
-with _col_mod:
-    st.markdown(
-        f'<p style="font-size:0.85rem;color:#4A6A8A;margin:6px 0 0 4px;font-weight:500;">'
-        f'{_mob_label}</p>',
-        unsafe_allow_html=True,
-    )
+# Módulo atual (o botão Menu nativo aparece automaticamente quando sidebar fecha)
+st.markdown(
+    f'<p style="font-size:0.85rem;color:#4A6A8A;margin:2px 0 6px 2px;font-weight:500;">'
+    f'{_mob_label}</p>',
+    unsafe_allow_html=True,
+)
 
 pagina = st.session_state.active_page
 
