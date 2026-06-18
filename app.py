@@ -1771,47 +1771,88 @@ elif pagina == 'Simulador':
     st.markdown("---")
     resultado = simular_realocacao(pl, novas)
 
-    col_ret, col_comp = st.columns(2)
-    with col_ret:
-        st.markdown("### Retorno Esperado")
-        retorno_atual = sum(
-            atuais[s] * {'Renda Fixa': 0.105, 'Renda Variável': 0.130,
-                          'Investimentos Estruturados': 0.115,
-                          'Investimentos no Exterior': 0.120,
-                          'Imóveis': 0.090,
-                          'Operações com Participantes': 0.155}.get(s, 0.10)
-            for s in atuais
-        ) * 100
+    TAXAS = {
+        'Renda Fixa': 0.105,
+        'Renda Variável': 0.130,
+        'Investimentos Estruturados': 0.115,
+        'Investimentos no Exterior': 0.120,
+        'Imóveis': 0.090,
+        'Operações com Participantes': 0.155,
+    }
 
-        col_r1, col_r2 = st.columns(2)
-        col_r1.metric("Retorno Atual (est.)", f"{retorno_atual:.2f}% a.a.")
-        col_r2.metric("Retorno Proposto (est.)",
-                      f"{resultado['retorno_esperado_ano']:.2f}% a.a.",
-                      delta=f"{resultado['retorno_esperado_ano'] - retorno_atual:+.2f}%")
+    retorno_atual = sum(atuais[s] * TAXAS.get(s, 0.10) for s in atuais) * 100
+    retorno_prop  = resultado['retorno_esperado_ano']
+    delta_ret     = retorno_prop - retorno_atual
 
-    with col_comp:
-        st.markdown("### Compliance da Proposta")
-        for seg, dados in resultado['compliance'].items():
-            emoji = '🟢' if dados['status'] == 'verde' else ('🟡' if dados['status'] == 'amarelo' else '🔴')
-            delta_pp = dados['pct_pl'] - atuais.get(seg, 0)
-            st.markdown(
-                f"{emoji} **{seg}** — {dados['pct_pl']:.1%} do PS "
-                f"({dados['pct_limite']:.0%} do limite) | delta: {delta_pp:+.1%}"
-            )
+    col_r1, col_r2, col_r3 = st.columns(3)
+    col_r1.metric("Retorno Atual (est.)",    f"{retorno_atual:.2f}% a.a.")
+    col_r2.metric("Retorno Proposto (est.)", f"{retorno_prop:.2f}% a.a.",
+                  delta=f"{delta_ret:+.2f}%")
+    col_r3.metric("Impacto no PS",
+                  f"R$ {pl * (retorno_prop - retorno_atual) / 100:+,.0f}",
+                  delta=f"{delta_ret:+.2f}% a.a.")
+
+    st.markdown("---")
+    st.markdown("### Relatório de Rendimento por Segmento")
+
+    rows = []
+    for seg in atuais:
+        taxa = TAXAS.get(seg, 0.10)
+        al_at = atuais[seg]
+        al_pr = novas.get(seg, 0.0)
+        rows.append({
+            'Segmento':           seg,
+            'Alocação Atual':     f"{al_at:.1%}",
+            'Alocação Proposta':  f"{al_pr:.1%}",
+            'Δ Alocação':         f"{al_pr - al_at:+.1%}",
+            'Taxa Est. a.a.':     f"{taxa:.1%}",
+            'Contribuição Atual': f"{al_at * taxa * 100:.3f}%",
+            'Contribuição Nova':  f"{al_pr * taxa * 100:.3f}%",
+            'Δ Contribuição':     f"{(al_pr - al_at) * taxa * 100:+.3f}%",
+        })
+    df_rel = pd.DataFrame(rows).set_index('Segmento')
+
+    def _colorir(val):
+        if isinstance(val, str) and val.startswith('+'):
+            return 'color: #1A7A45; font-weight:600'
+        if isinstance(val, str) and val.startswith('-'):
+            return 'color: #C0392B; font-weight:600'
+        return ''
+
+    st.dataframe(
+        df_rel.style.applymap(_colorir, subset=['Δ Alocação', 'Δ Contribuição']),
+        use_container_width=True,
+    )
+
+    st.markdown("---")
+    st.markdown("### Projeção de Crescimento do Patrimônio")
+
+    anos = [1, 2, 3, 5, 10]
+    proj_rows = []
+    for a in anos:
+        ps_at  = pl * (1 + retorno_atual / 100) ** a
+        ps_pr  = pl * (1 + retorno_prop  / 100) ** a
+        proj_rows.append({
+            'Horizonte': f"{a} ano{'s' if a > 1 else ''}",
+            'Com Alocação Atual':    f"R$ {ps_at:,.0f}",
+            'Com Alocação Proposta': f"R$ {ps_pr:,.0f}",
+            'Ganho Adicional':       f"R$ {ps_pr - ps_at:+,.0f}",
+        })
+    st.dataframe(pd.DataFrame(proj_rows).set_index('Horizonte'), use_container_width=True)
 
     st.markdown("---")
     st.markdown("### Atual vs Proposto")
     segs = list(atuais.keys())
     fig_sim = go.Figure()
-    fig_sim.add_bar(name='Atual',   x=segs, y=[atuais[s]*100 for s in segs], marker_color='#2E86C1')
-    fig_sim.add_bar(name='Proposto', x=segs, y=[novas[s]*100 for s in segs],  marker_color='#27AE60')
+    fig_sim.add_bar(name='Atual',    x=segs, y=[atuais[s]*100 for s in segs], marker_color='#2E86C1')
+    fig_sim.add_bar(name='Proposto', x=segs, y=[novas[s]*100  for s in segs], marker_color='#27AE60')
     fig_sim.add_bar(name='Limite CMN 4.994',
                     x=segs, y=[limites[s]*100 for s in segs],
                     marker_color='rgba(231,76,60,0.3)')
     fig_sim.update_layout(barmode='group', yaxis_title='% do PS',
                           xaxis_tickangle=-20, margin=dict(t=10, b=10),
                           legend=dict(orientation='h', y=1.05))
-    st.plotly_chart(fig_sim, width='stretch')
+    st.plotly_chart(fig_sim, use_container_width=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
