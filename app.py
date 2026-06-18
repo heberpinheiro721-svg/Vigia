@@ -845,31 +845,42 @@ if pagina == 'Dashboard':
               delta_color="inverse" if a_cnt else "off")
 
     # ── Saúde da Carteira ─────────────────────────────────────────────────────
-    # Compliance (40 pts): verde=1.0, amarelo=0.5, vermelho=0.0 por segmento
-    pts_comp = (sum({'verde':1.0,'amarelo':0.5,'vermelho':0.0}.get(s['status'],0)
-                    for s in resumo) / total_segs * 40) if total_segs else 40.0
+    # Foco: desempenho dos fundos e meta atuarial
+    # Meta Atuarial (50 pts) + Rentabilidade vs CDI (30 pts) + Compliance guardrail (20 pts)
 
-    # Risco/Concentração (20 pts): menor uso dos limites = mais seguro
-    _usos = [s.get('pct_limite', 0) for s in resumo if s.get('valor', 0) > 0]
-    pts_risco = max(0.0, 20.0 * (1 - (sum(_usos) / len(_usos) if _usos else 0)))
-
-    # Performance vs meta atuarial (40 pts) — escala contínua: ≥0%→1.0, -6%→0.0
     if df_cotas is not None:
         _meta_s = calcular_meta_atuarial(
             df_cotas, b.get('inpc_mes', 0.0), b.get('inpc_ano', 0.0),
             b['cdi_mes'], b['cdi_ano'],
         )
         _pl_s = _meta_s['planos']
-        if not _pl_s.empty:
-            _scores = [max(0.0, min(1.0, (r['Δ Ano (%)'] + 6) / 6))
-                       for _, r in _pl_s.iterrows()]
-            pts_perf = sum(_scores) / len(_scores) * 40
-        else:
-            pts_perf = 20.0
     else:
-        pts_perf = 20.0
+        _pl_s = None
 
-    saude = max(0, min(100, round(pts_comp + pts_risco + pts_perf)))
+    # 1. Meta Atuarial (50 pts) — quão próximo cada plano está da sua meta no ano
+    #    Δ Ano ≥ 0%  → 1.0 | Δ Ano = -5pp → 0.0  (escala contínua)
+    if _pl_s is not None and not _pl_s.empty:
+        _meta_scores = [max(0.0, min(1.0, (r['Δ Ano (%)'] + 5) / 5))
+                        for _, r in _pl_s.iterrows()]
+        pts_meta = sum(_meta_scores) / len(_meta_scores) * 50
+    else:
+        pts_meta = 25.0  # neutro sem dados
+
+    # 2. Rentabilidade vs CDI (30 pts) — retorno ano de cada plano vs CDI ano
+    #    retorno ≥ CDI → 1.0 | retorno = CDI - 5pp → 0.0
+    cdi_ano = b.get('cdi_ano', 0.0)
+    if _pl_s is not None and not _pl_s.empty:
+        _cdi_scores = [max(0.0, min(1.0, (r['Retorno Ano (%)'] - cdi_ano + 5) / 5))
+                       for _, r in _pl_s.iterrows()]
+        pts_cdi = sum(_cdi_scores) / len(_cdi_scores) * 30
+    else:
+        pts_cdi = 15.0  # neutro sem dados
+
+    # 3. Compliance CMN (20 pts) — guardrail regulatório
+    pts_comp = (sum({'verde':1.0,'amarelo':0.5,'vermelho':0.0}.get(s['status'],0)
+                    for s in resumo) / total_segs * 20) if total_segs else 20.0
+
+    saude = max(0, min(100, round(pts_meta + pts_cdi + pts_comp)))
 
     if saude >= 85:
         _sl, _sc, _sbg = "Excelente", "#1A7A40", "#E8F8F1"
@@ -882,10 +893,10 @@ if pagina == 'Dashboard':
     else:
         _sl, _sc, _sbg = "Crítico",   "#C0392B", "#FDE8E8"
 
-    _bar_w   = saude
+    _bar_w     = saude
+    _sub_meta  = round(pts_meta)
+    _sub_cdi   = round(pts_cdi)
     _sub_comp  = round(pts_comp)
-    _sub_perf  = round(pts_perf)
-    _sub_risco = round(pts_risco)
 
     def _cor_sub(v, mx):
         p = v / mx * 100
@@ -910,17 +921,17 @@ if pagina == 'Dashboard':
         f'</div>'
         f'<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">'
         f'<div style="background:rgba(0,0,0,0.06);border-radius:8px;padding:5px 10px;text-align:center;">'
+        f'<div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;">Meta Atuarial</div>'
+        f'<div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_meta,50)};">'
+        f'{_sub_meta}<span style="font-size:0.65rem;color:#8AAECB;">/50</span></div></div>'
+        f'<div style="background:rgba(0,0,0,0.06);border-radius:8px;padding:5px 10px;text-align:center;">'
+        f'<div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;">vs CDI</div>'
+        f'<div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_cdi,30)};">'
+        f'{_sub_cdi}<span style="font-size:0.65rem;color:#8AAECB;">/30</span></div></div>'
+        f'<div style="background:rgba(0,0,0,0.06);border-radius:8px;padding:5px 10px;text-align:center;">'
         f'<div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;">Compliance</div>'
-        f'<div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_comp,40)};">'
-        f'{_sub_comp}<span style="font-size:0.65rem;color:#8AAECB;">/40</span></div></div>'
-        f'<div style="background:rgba(0,0,0,0.06);border-radius:8px;padding:5px 10px;text-align:center;">'
-        f'<div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;">Performance</div>'
-        f'<div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_perf,40)};">'
-        f'{_sub_perf}<span style="font-size:0.65rem;color:#8AAECB;">/40</span></div></div>'
-        f'<div style="background:rgba(0,0,0,0.06);border-radius:8px;padding:5px 10px;text-align:center;">'
-        f'<div style="font-size:0.60rem;color:#6B7E96;font-weight:600;text-transform:uppercase;">Risco</div>'
-        f'<div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_risco,20)};">'
-        f'{_sub_risco}<span style="font-size:0.65rem;color:#8AAECB;">/20</span></div></div>'
+        f'<div style="font-size:1.0rem;font-weight:800;color:{_cor_sub(_sub_comp,20)};">'
+        f'{_sub_comp}<span style="font-size:0.65rem;color:#8AAECB;">/20</span></div></div>'
         f'</div></div></div></div>',
         unsafe_allow_html=True,
     )
