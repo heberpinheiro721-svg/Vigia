@@ -395,32 +395,36 @@ footer { visibility: hidden; }
         fill: #FFFFFF !important;
         stroke: #FFFFFF !important;
     }
-    /* Botão hambúrguer — visível sobre fundo branco (Android) */
+    /* Botão para reabrir a sidebar — FAB flutuante visível */
     [data-testid="collapsedControl"] {
+        position: fixed !important;
+        bottom: 90px !important;
+        left: 16px !important;
+        top: auto !important;
+        width: 56px !important;
+        height: 56px !important;
         background: #1B3A6B !important;
-        border-radius: 0 10px 10px 0 !important;
-        width: 44px !important;
-        height: 44px !important;
+        border-radius: 50% !important;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.40) !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        box-shadow: 2px 2px 6px rgba(0,0,0,0.25) !important;
-        position: fixed !important;
-        top: 60px !important;
-        left: 0 !important;
         z-index: 9999 !important;
     }
-    [data-testid="collapsedControl"] svg {
-        width: 22px !important;
-        height: 22px !important;
-        fill: #FFFFFF !important;
-        stroke: #FFFFFF !important;
-    }
     [data-testid="collapsedControl"] button {
-        background: transparent !important;
-        border: none !important;
         width: 100% !important;
         height: 100% !important;
+        background: transparent !important;
+        border: none !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    [data-testid="collapsedControl"] svg {
+        fill: #FFFFFF !important;
+        stroke: #FFFFFF !important;
+        width: 26px !important;
+        height: 26px !important;
     }
 }
 
@@ -434,6 +438,24 @@ footer { visibility: hidden; }
     .vigia-header-sub { display: none !important; }
 }
 </style>
+<script>
+(function() {
+    /* Abre a sidebar automaticamente ao carregar no mobile */
+    function abrirSidebar() {
+        var sidebar = document.querySelector('[data-testid="stSidebar"]');
+        if (!sidebar) return;
+        var expandido = sidebar.getAttribute('aria-expanded');
+        if (expandido === 'false') {
+            var btn = document.querySelector('[data-testid="collapsedControl"] button');
+            if (btn) { btn.click(); }
+        }
+    }
+    if (window.innerWidth <= 768) {
+        setTimeout(abrirSidebar, 600);
+        setTimeout(abrirSidebar, 1500);
+    }
+})();
+</script>
 """, unsafe_allow_html=True)
 
 # ── Session state ─────────────────────────────────────────────────────────────
