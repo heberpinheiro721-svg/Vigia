@@ -262,6 +262,13 @@ footer { visibility: hidden; }
 [data-testid="stToolbar"] { display: none !important; }
 [data-testid="stDecoration"] { display: none !important; }
 
+/* Botão nativo do Streamlit para reabrir a sidebar */
+[data-testid="collapsedControl"],
+[data-testid="stSidebarCollapsedControl"] {
+    opacity: 0 !important;   /* invisível mas clicável pelo JS */
+    pointer-events: none !important;
+}
+
 /* Navegação mobile — radio escondido no desktop */
 @media screen and (min-width: 769px) {
     [data-testid="stRadio"][aria-label="📱 Módulo"],
@@ -421,25 +428,34 @@ if 'active_page' not in st.session_state:
 if 'sidebar_just_opened' not in st.session_state:
     st.session_state.sidebar_just_opened = False
 
-# ── CSS da sidebar ─────────────────────────────────────────────────────────────
-# Quando o botão Menu é clicado: força abertura por UM render (sem travar o «»)
+# ── Abre sidebar via JS quando botão Menu é clicado ───────────────────────────
+# Clica no botão nativo do Streamlit — sem CSS de transform (não bloqueia «»)
 if st.session_state.sidebar_just_opened:
-    st.markdown("""<style>
-    section[data-testid="stSidebar"] {
-        display: flex !important;
-        transform: translateX(0) !important;
-        min-width: 244px !important;
-    }
-    [data-testid="collapsedControl"],
-    [data-testid="stSidebarCollapsedControl"] { display: none !important; }
-    </style>""", unsafe_allow_html=True)
-    st.session_state.sidebar_just_opened = False  # libera para próximo render
-else:
-    # Esconde apenas o botão nativo (substituído pelo nosso ☰ Menu)
-    st.markdown("""<style>
-    [data-testid="collapsedControl"],
-    [data-testid="stSidebarCollapsedControl"] { display: none !important; }
-    </style>""", unsafe_allow_html=True)
+    st_components.html("""
+    <script>
+    (function() {
+        function openSidebar() {
+            try {
+                var doc = window.parent.document;
+                var selectors = [
+                    '[data-testid="collapsedControl"] button',
+                    '[data-testid="stSidebarCollapsedControl"] button',
+                    'button[aria-label="Open sidebar"]',
+                    'button[aria-label="Abrir barra lateral"]'
+                ];
+                for (var i = 0; i < selectors.length; i++) {
+                    var el = doc.querySelector(selectors[i]);
+                    if (el) { el.click(); return true; }
+                }
+            } catch(e) {}
+            return false;
+        }
+        if (!openSidebar()) { setTimeout(openSidebar, 300); }
+        setTimeout(openSidebar, 700);
+    })();
+    </script>
+    """, height=1, scrolling=False)
+    st.session_state.sidebar_just_opened = False
 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown("""
