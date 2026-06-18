@@ -351,31 +351,31 @@ footer { visibility: hidden; }
     /* Texto geral */
     p, .stCaption { font-size: 0.82rem !important; }
 
-    /* Botão hambúrguer — maior e visível */
+    /* Barra de topo do Streamlit — fundo azul VIGIA no mobile */
+    header[data-testid="stHeader"] {
+        background: #1B3A6B !important;
+        min-height: 52px !important;
+    }
+    /* Todos os botões dentro do header — ícone branco */
+    header[data-testid="stHeader"] button,
+    header[data-testid="stHeader"] a {
+        color: #FFFFFF !important;
+    }
+    header[data-testid="stHeader"] button svg,
+    header[data-testid="stHeader"] svg {
+        fill: #FFFFFF !important;
+        stroke: #FFFFFF !important;
+    }
+    /* Botão hambúrguer específico */
     [data-testid="collapsedControl"] {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        position: fixed !important;
-        top: 12px !important;
-        left: 12px !important;
-        z-index: 999999 !important;
+        background: transparent !important;
         width: 48px !important;
         height: 48px !important;
-        background: #1B3A6B !important;
-        border-radius: 12px !important;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.35) !important;
-        border: none !important;
-        cursor: pointer !important;
     }
     [data-testid="collapsedControl"] svg {
-        width: 24px !important;
-        height: 24px !important;
+        width: 26px !important;
+        height: 26px !important;
         fill: #FFFFFF !important;
-        color: #FFFFFF !important;
-    }
-    [data-testid="collapsedControl"] span {
-        color: #FFFFFF !important;
     }
 }
 
