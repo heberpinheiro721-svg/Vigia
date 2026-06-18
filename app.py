@@ -395,16 +395,32 @@ footer { visibility: hidden; }
         fill: #FFFFFF !important;
         stroke: #FFFFFF !important;
     }
-    /* Botão hambúrguer específico */
+    /* Botão hambúrguer — visível sobre fundo branco (Android) */
     [data-testid="collapsedControl"] {
-        background: transparent !important;
-        width: 48px !important;
-        height: 48px !important;
+        background: #1B3A6B !important;
+        border-radius: 0 10px 10px 0 !important;
+        width: 44px !important;
+        height: 44px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: 2px 2px 6px rgba(0,0,0,0.25) !important;
+        position: fixed !important;
+        top: 60px !important;
+        left: 0 !important;
+        z-index: 9999 !important;
     }
     [data-testid="collapsedControl"] svg {
-        width: 26px !important;
-        height: 26px !important;
+        width: 22px !important;
+        height: 22px !important;
         fill: #FFFFFF !important;
+        stroke: #FFFFFF !important;
+    }
+    [data-testid="collapsedControl"] button {
+        background: transparent !important;
+        border: none !important;
+        width: 100% !important;
+        height: 100% !important;
     }
 }
 
