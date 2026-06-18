@@ -261,6 +261,21 @@ footer { visibility: hidden; }
 [data-testid="stToolbar"] { display: none !important; }
 [data-testid="stDecoration"] { display: none !important; }
 
+/* Navegação mobile — escondida no desktop */
+.mobile-nav-wrap { display: none !important; }
+@media screen and (max-width: 768px) {
+    .mobile-nav-wrap {
+        display: block !important;
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 900 !important;
+        background: #FFFFFF !important;
+        padding: 6px 0 4px 0 !important;
+        border-bottom: 2px solid #1B3A6B !important;
+        margin-bottom: 10px !important;
+    }
+}
+
 /* ── Mobile ── */
 @media screen and (max-width: 768px) {
     /* Padding da página */
@@ -398,6 +413,8 @@ if 'chat_historico' not in st.session_state:
     st.session_state.chat_historico = []
 if 'chat_persona' not in st.session_state:
     st.session_state.chat_persona = 'vigia'
+if 'active_page' not in st.session_state:
+    st.session_state.active_page = 'Dashboard'
 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -462,12 +479,18 @@ with st.sidebar:
         "📰 Notícias":            "Notícias",
         "📈 Histórico":           "Histórico",
     }
+    _nav_keys = list(MODULOS.keys())
+    _nav_vals = list(MODULOS.values())
+    _nav_idx  = _nav_vals.index(st.session_state.active_page) if st.session_state.active_page in _nav_vals else 0
     pagina_label = st.radio(
         "Navegação",
-        list(MODULOS.keys()),
+        _nav_keys,
+        index=_nav_idx,
         label_visibility="collapsed",
     )
-    pagina = MODULOS[pagina_label]
+    if MODULOS[pagina_label] != st.session_state.active_page:
+        st.session_state.active_page = MODULOS[pagina_label]
+        st.rerun()
 
     st.markdown("---")
     st.markdown("### ⚙️ Dados")
@@ -644,6 +667,21 @@ except Exception:
                   'cdi_ano': 0.0, 'ipca_ano': 0.0, 'inpc_ano': 0.0,
                   'ibov_mes': 0.0, 'ibov_ano': 0.0}
 
+
+# ── Navegação mobile ──────────────────────────────────────────────────────────
+_mob_keys = list(MODULOS.keys())
+_mob_vals = list(MODULOS.values())
+_mob_label = _mob_keys[_mob_vals.index(st.session_state.active_page)] if st.session_state.active_page in _mob_vals else _mob_keys[0]
+if st.session_state.get('_mob_nav') != _mob_label:
+    st.session_state['_mob_nav'] = _mob_label
+st.markdown('<div class="mobile-nav-wrap">', unsafe_allow_html=True)
+_mob_sel = st.selectbox("Módulo", _mob_keys, key="_mob_nav", label_visibility="collapsed")
+st.markdown('</div>', unsafe_allow_html=True)
+if MODULOS[_mob_sel] != st.session_state.active_page:
+    st.session_state.active_page = MODULOS[_mob_sel]
+    st.rerun()
+
+pagina = st.session_state.active_page
 
 # ══════════════════════════════════════════════════════════════════════════════
 # MÓDULO: DASHBOARD
