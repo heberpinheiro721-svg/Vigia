@@ -516,12 +516,7 @@ with st.sidebar:
     usar_local = st.checkbox("Usar arquivo local (data/Composição/)", value=True)
     data_ref = st.text_input("Data de referência", value=DATA_DEFAULT)
 
-    st.divider()
-    st.markdown("### 🤖 Análise IA")
-    _default_key = st.secrets.get("GROQ_API_KEY", "") if hasattr(st, "secrets") else ""
-    api_key = st.text_input("Chave API Groq", type="password",
-                            value=_default_key,
-                            help="Gratuita em console.groq.com → API Keys")
+    api_key = st.secrets.get("GROQ_API_KEY", "") if hasattr(st, "secrets") else ""
 
     st.divider()
     st.caption("IAJA · PREVIC · Res. CMN 4.994/2022")
@@ -1865,10 +1860,7 @@ elif pagina == 'Análise IA':
     st.markdown('<div class="secao-titulo">🤖 Diagnóstico Executivo por Inteligência Artificial</div>', unsafe_allow_html=True)
     st.caption("Powered by Groq (Llama 3.3 70B)")
 
-    if not api_key:
-        st.warning("⚠️ Insira sua chave da API Groq no painel lateral. Gratuita em console.groq.com")
-    else:
-        if st.button("🚀 Gerar Diagnóstico Completo", type="primary", width='stretch'):
+    if st.button("🚀 Gerar Diagnóstico Completo", type="primary", width='stretch'):
             with st.spinner("Analisando carteira com IA..."):
                 try:
                     st.session_state.analise_ia = gerar_analise_compliance(resumo, pl, data_ref, api_key)
@@ -1890,10 +1882,6 @@ elif pagina == 'Chat':
         f'<div class="secao-titulo">💬 Chat Personas — {_p_ativo["emoji"]} {_p_ativo["nome"]}</div>',
         unsafe_allow_html=True,
     )
-
-    if not api_key:
-        st.warning("⚠️ Insira sua chave API Groq no painel lateral para usar o chat. Gratuita em console.groq.com")
-        st.stop()
 
     # ── Seleção de persona ──────────────────────────────────────────────────
     st.markdown("##### Escolha com quem você quer conversar")
@@ -2104,9 +2092,7 @@ elif pagina == 'Relatório PDF':
     st.caption("Relatório completo com benchmarks, desempenho dos planos, compliance e análise por IA.")
 
     if api_key:
-        st.success("✅ Análise detalhada por IA será gerada automaticamente e incluída no relatório.")
-    else:
-        st.info("💡 Configure a chave Groq no painel lateral para incluir análise por IA no PDF.")
+        st.success("✅ Análise detalhada por IA será incluída no relatório.")
 
     if st.button("📥 Gerar Relatório PDF", type="primary", width='stretch'):
         with st.spinner("Preparando dados e gerando PDF..."):
