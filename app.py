@@ -450,6 +450,29 @@ if 'chat_persona' not in st.session_state:
     st.session_state.chat_persona = 'vigia'
 if 'active_page' not in st.session_state:
     st.session_state.active_page = 'Dashboard'
+if 'sidebar_open' not in st.session_state:
+    st.session_state.sidebar_open = True
+
+# ── CSS dinâmico: força sidebar aberta ou escondida via session state ──────────
+if st.session_state.sidebar_open:
+    st.markdown("""<style>
+    section[data-testid="stSidebar"] {
+        display: flex !important;
+        transform: translateX(0) !important;
+        min-width: 244px !important;
+    }
+    /* Esconde botão nativo «» para não conflitar com o nosso */
+    [data-testid="stSidebarCollapseButton"],
+    [data-testid="collapsedControl"],
+    [data-testid="stSidebarCollapsedControl"] { display: none !important; }
+    </style>""", unsafe_allow_html=True)
+else:
+    st.markdown("""<style>
+    section[data-testid="stSidebar"] { display: none !important; }
+    [data-testid="stSidebarCollapseButton"],
+    [data-testid="collapsedControl"],
+    [data-testid="stSidebarCollapsedControl"] { display: none !important; }
+    </style>""", unsafe_allow_html=True)
 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -486,14 +509,18 @@ st.markdown("""
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("""
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0 12px 0;">
-      <div>
-        <div style="font-size:1.35rem;font-weight:800;color:#FFFFFF;letter-spacing:-0.02em;">🔍 VIGIA</div>
-        <div style="font-size:0.68rem;color:#5A88B5;margin-top:2px;letter-spacing:0.04em;">ANÁLISE DE INVESTIMENTOS</div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
+    _sb_c1, _sb_c2 = st.columns([4, 1])
+    with _sb_c1:
+        st.markdown("""
+        <div style="padding:4px 0 12px 0;">
+          <div style="font-size:1.35rem;font-weight:800;color:#FFFFFF;letter-spacing:-0.02em;">🔍 VIGIA</div>
+          <div style="font-size:0.68rem;color:#5A88B5;margin-top:2px;letter-spacing:0.04em;">ANÁLISE DE INVESTIMENTOS</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with _sb_c2:
+        if st.button("«", key="fechar_sidebar", help="Fechar menu"):
+            st.session_state.sidebar_open = False
+            st.rerun()
     st.markdown("---")
 
     # Navegação principal
@@ -707,12 +734,25 @@ if st.session_state.get('_nav_source') == 'sidebar':
     st.session_state['_mob_radio'] = _mob_label
     st.session_state['_nav_source'] = None
 
-# Módulo atual (o botão Menu nativo aparece automaticamente quando sidebar fecha)
-st.markdown(
-    f'<p style="font-size:0.85rem;color:#4A6A8A;margin:2px 0 6px 2px;font-weight:500;">'
-    f'{_mob_label}</p>',
-    unsafe_allow_html=True,
-)
+# Barra superior: botão Menu (quando sidebar fechada) + módulo atual
+if not st.session_state.sidebar_open:
+    _c_menu, _c_mod = st.columns([1, 5])
+    with _c_menu:
+        if st.button("☰ Menu", key="abrir_sidebar", use_container_width=True):
+            st.session_state.sidebar_open = True
+            st.rerun()
+    with _c_mod:
+        st.markdown(
+            f'<p style="font-size:0.85rem;color:#4A6A8A;margin:6px 0 0 4px;font-weight:500;">'
+            f'{_mob_label}</p>',
+            unsafe_allow_html=True,
+        )
+else:
+    st.markdown(
+        f'<p style="font-size:0.85rem;color:#4A6A8A;margin:2px 0 6px 2px;font-weight:500;">'
+        f'{_mob_label}</p>',
+        unsafe_allow_html=True,
+    )
 
 pagina = st.session_state.active_page
 
