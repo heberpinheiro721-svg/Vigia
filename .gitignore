@@ -10,8 +10,7 @@ vigia_venv/
 venv/
 .venv/
 
-# Dados sensíveis e arquivos gerados
-data/
+# Dados gerados/histórico
 reports/
 historico/
 
@@ -44,5 +43,5 @@ Thumbs.db
 desktop.ini
 $RECYCLE.BIN/
 
-# PDF gerados
-*.pdf
+# PDF gerados pelo app (relatórios)
+reports/*.pdf
