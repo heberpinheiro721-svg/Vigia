@@ -79,29 +79,33 @@ def parse_posicao(filepath: Path) -> dict:
 
     def rev(idx): return list(reversed(serie(idx)))
 
-    # IAJA Total histórico = Bancos (L10=idx9) + Total Aplicações (L18=idx17)
-    bancos_iaja  = rev(9)
-    aplic_iaja   = rev(17)
-    total_iaja_h = [b + a for b, a in zip(bancos_iaja, aplic_iaja)]
+    # IAJA Total = Bancos (L10=idx9) + Aplicações (L18=idx17)
+    total_iaja_h = [b + a for b, a in zip(rev(9), rev(17))]
 
-    # PPG Total histórico = Bancos (L37=idx36) + Carteira (L40=idx39)
-    bancos_ppg  = rev(36)
-    cart_ppg    = rev(39)
-    total_ppg_h = [b + c for b, c in zip(bancos_ppg, cart_ppg)]
+    # ASSISTENCIAL Total = Bancos (L24=idx23) + Aplicações (L33=idx32)
+    total_ass_h  = [b + a for b, a in zip(rev(23), rev(32))]
 
-    hist_iaja = {'datas': datas, 'Total': total_iaja_h}
-    hist_ppg  = {'datas': datas, 'Total': total_ppg_h}
+    # PPG Total em US$ = Bancos (L37=idx36) + Carteira (L40=idx39)
+    total_ppg_h  = [b + c for b, c in zip(rev(36), rev(39))]
+
+    # BRASIL = IAJA + ASSISTENCIAL (em R$)
+    total_brasil_h = [i + a for i, a in zip(total_iaja_h, total_ass_h)]
+
+    # CONSOLIDADO = Brasil + PPG × cotação (usando cotação atual como proxy histórico)
+    total_cons_h = [b + p * cotacao_usd for b, p in zip(total_brasil_h, total_ppg_h)]
 
     return {
-        'data_ref':       data_ref,
-        'data_relatorio': data_relatorio,
-        'iaja':           iaja,
-        'ppg':            ppg,
-        'assistencial':   assistencial,
-        'consolidado':    consolidado,
-        'cotacao_usd':    cotacao_usd,
-        'hist_iaja':      hist_iaja,
-        'hist_ppg':       hist_ppg,
+        'data_ref':        data_ref,
+        'data_relatorio':  data_relatorio,
+        'iaja':            iaja,
+        'ppg':             ppg,
+        'assistencial':    assistencial,
+        'consolidado':     consolidado,
+        'cotacao_usd':     cotacao_usd,
+        'hist_datas':      datas,
+        'hist_brasil':     total_brasil_h,   # IAJA + Assistencial (R$)
+        'hist_ppg':        total_ppg_h,      # PPG total (US$)
+        'hist_consolidado': total_cons_h,    # Brasil + PPG×cotação (R$)
     }
 
 
