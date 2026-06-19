@@ -1622,19 +1622,13 @@ elif pagina == 'Posição Financeira':
         if not validos:
             return go.Figure()
         y_min = min(validos) * 0.97
-        y_max = max(validos) * 1.15  # 15% acima → valor atual fica ~1 dedo abaixo
-        # Linha base invisível na altura do y_min para fill ficar delimitado
+        y_max = max(validos) * 1.15
         fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=datas, y=[y_min] * len(datas),
-            mode='lines', line=dict(width=0), showlegend=False,
-            hoverinfo='skip',
-        ))
         fig.add_trace(go.Scatter(
             x=datas, y=valores,
             mode='lines', name=titulo,
             line=dict(color=cor, width=2.5),
-            fill='tonexty', fillcolor=fill_cor,
+            fill='tozeroy', fillcolor=fill_cor,
             hovertemplate=f'<b>{hover_label}</b><br>%{{x}}<br>{prefixo} %{{y:,.0f}}<extra></extra>',
         ))
         fig.update_layout(
@@ -1664,13 +1658,13 @@ elif pagina == 'Posição Financeira':
 
     with g2:
         st.plotly_chart(
-            _graf('PPG (Uruguai / USA)', datas,
+            _graf('PPG', datas,
                   d['hist_ppg'], '#27AE60', 'rgba(39,174,96,0.12)', 'US$', 'PPG'),
             use_container_width=True, key='fig_ppg',
         )
 
     st.plotly_chart(
-        _graf(f'IAJA Consolidado — Total em R$ (PPG × {d["cotacao_usd"]:.2f})', datas,
+        _graf(f'IAJA Consolidado em R$ (cotação US$ {d["cotacao_usd"]:.2f})', datas,
               d['hist_consolidado'], '#2472B5', 'rgba(36,114,181,0.12)', 'R$', 'Consolidado'),
         use_container_width=True, key='fig_consolidado',
     )
