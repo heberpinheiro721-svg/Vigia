@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import streamlit as st
 import streamlit.components.v1 as st_components
 import streamlit_authenticator as stauth
@@ -6,6 +8,8 @@ import plotly.express as px
 import pandas as pd
 import numpy as np
 import pickle
+import calendar as _calendar_app
+from datetime import date
 from pathlib import Path
 
 from parser import load_carteira_s3
@@ -35,7 +39,9 @@ st.set_page_config(
 )
 
 PL_DEFAULT   = 2_107_321_289.97
-DATA_DEFAULT = "31/03/2026"
+_hoje        = date.today()
+_ult_dia     = _calendar_app.monthrange(_hoje.year, _hoje.month)[1]
+DATA_DEFAULT = f"{_ult_dia:02d}/{_hoje.month:02d}/{_hoje.year}"
 COR  = {'verde': '#27AE60', 'amarelo': '#E67E22', 'vermelho': '#E74C3C'}
 AZUL = '#1B3A6B'
 
@@ -840,6 +846,17 @@ except Exception:
                   'cdi_ano': 0.0, 'ipca_ano': 0.0, 'inpc_ano': 0.0,
                   'ibov_mes': 0.0, 'ibov_ano': 0.0}
 
+# df_cotas filtrado até o último dia do mês de referência
+# Garante que Rendimentos, Meta e Saúde reflitam exatamente o período selecionado
+if df_cotas is not None:
+    _ult_dia_ref = _calendar_app.monthrange(ano_ref, mes_ref)[1]
+    _limite_ref  = pd.Timestamp(ano_ref, mes_ref, _ult_dia_ref)
+    df_cotas_ref = df_cotas[df_cotas['Data'] <= _limite_ref]
+    if df_cotas_ref.empty:
+        df_cotas_ref = df_cotas
+else:
+    df_cotas_ref = None
+
 
 # ── Navegação mobile ──────────────────────────────────────────────────────────
 _mob_keys = list(MODULOS.keys())
@@ -934,8 +951,8 @@ if pagina == 'Dashboard':
     _inpc_mes_lp = b.get('inpc_mes', 0.0)
     _inpc_ano_lp = b.get('inpc_ano', 0.0)
 
-    if df_cotas is not None:
-        _ult_pos = ultima_posicao(df_cotas)
+    if df_cotas_ref is not None:
+        _ult_pos = ultima_posicao(df_cotas_ref)
         _pl_lp   = _ult_pos[_ult_pos['fundo'].isin(_SPREADS_LP.keys())]
 
         # 1. Acumulado histórico vs meta acumulada (60 pts)
@@ -956,7 +973,7 @@ if pagina == 'Dashboard':
         # 2. Aderência à meta no ano corrente (25 pts)
         # Δ Ano ≥ 0 → 1.0 | Δ Ano = -5pp → 0.0
         _meta_lp = calcular_meta_atuarial(
-            df_cotas, _inpc_mes_lp, _inpc_ano_lp, b['cdi_mes'], b['cdi_ano'],
+            df_cotas_ref, _inpc_mes_lp, _inpc_ano_lp, b['cdi_mes'], b['cdi_ano'],
         )
         _pls_lp = _meta_lp['planos']
         if not _pls_lp.empty:
@@ -1121,10 +1138,10 @@ if pagina == 'Dashboard':
         </div>
         """, unsafe_allow_html=True)
 
-        if df_cotas is not None:
+        if df_cotas_ref is not None:
             from analytics import calcular_meta_atuarial
             meta = calcular_meta_atuarial(
-                df_cotas,
+                df_cotas_ref,
                 b.get('inpc_mes', 0.0), b.get('inpc_ano', 0.0),
                 b['cdi_mes'], b['cdi_ano'],
             )
@@ -1249,7 +1266,7 @@ if pagina == 'Dashboard':
     # ══════════════════════════════════════════════════════════════════════════
     st.markdown("<div style='margin-top:4px;'></div>", unsafe_allow_html=True)
 
-    if df_cotas is not None:
+    if df_cotas_ref is not None:
         st.markdown("""
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
           <div style="width:4px;height:22px;background:#27AE60;border-radius:4px;"></div>
@@ -1260,7 +1277,7 @@ if pagina == 'Dashboard':
         </div>
         """, unsafe_allow_html=True)
 
-        ultimo = ultima_posicao(df_cotas)
+        ultimo = ultima_posicao(df_cotas_ref)
         planos_nomes = ['PL Alpha', 'PL Beta', 'PL Gama', 'Administrativo']
         linhas = []
         for nome in planos_nomes:
@@ -1355,11 +1372,11 @@ if pagina == 'Dashboard':
                 f"  INPC: {b.get('inpc_mes',0):.2f}% mês / {b.get('inpc_ano',0):.2f}% ano\n"
                 f"  Ibovespa: {b.get('ibov_mes',0):.2f}% mês / {b.get('ibov_ano',0):.2f}% ano"
             )
-            if df_cotas is not None:
+            if df_cotas_ref is not None:
                 from analytics import calcular_meta_atuarial
-                ult_b = ultima_posicao(df_cotas)
+                ult_b = ultima_posicao(df_cotas_ref)
                 meta_b = calcular_meta_atuarial(
-                    df_cotas,
+                    df_cotas_ref,
                     b.get('inpc_mes', 0.0), b.get('inpc_ano', 0.0),
                     b['cdi_mes'], b['cdi_ano'],
                 )
