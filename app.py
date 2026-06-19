@@ -1499,11 +1499,11 @@ elif pagina == 'Posição Financeira':
     arquivo_sel = arquivos_pos[sel_idx]
 
     @st.cache_data(ttl=86400, show_spinner=False)
-    def _cached_posicao(path_str: str, mtime: float):
+    def _cached_posicao(path_str: str, mtime: float, cache_v: int = 1):
         return parse_posicao(Path(path_str))
 
     with st.spinner("Lendo relatório..."):
-        d = _cached_posicao(str(arquivo_sel), arquivo_sel.stat().st_mtime)
+        d = _cached_posicao(str(arquivo_sel), arquivo_sel.stat().st_mtime, cache_v=2)
 
     data_rel_str = d['data_relatorio'].strftime('%d/%m/%Y') if d['data_relatorio'] else ''
 
