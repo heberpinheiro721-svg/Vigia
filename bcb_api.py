@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import requests
 import calendar as _calendar
 from datetime import datetime

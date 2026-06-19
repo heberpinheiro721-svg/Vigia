@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import re
 import pdfplumber
-import openpyxl
 from pathlib import Path
 
 
@@ -49,7 +50,6 @@ def _detectar_plano_pdf(texto: str) -> str | None:
 
 
 def _detectar_plano_xlsx(nome_col9: str, func_code: str) -> str | None:
-    """Detecta plano pela col 9 (nome) e col 6 (código de função) do XLSX."""
     nome = str(nome_col9 or '').upper()
     code = str(func_code or '').strip()
     if 'PGA' in nome or code in FUNCOES_PGA:
@@ -107,30 +107,27 @@ def _parse_xlsx(filepath) -> dict:
       Col 1 (idx 0)  — código da conta
       Col 2 (idx 1)  — 'Função:' nas linhas de identificação do plano
       Col 6 (idx 5)  — código de função (99701/99702/99703 = PGA)
-      Col 9 (idx 8)  — nome do plano ('Plano ALPHA', 'Operações PGA - Alpha', …)
+      Col 9 (idx 8)  — nome do plano
       Col 43 (idx 42) — total acumulado do período
     """
+    import openpyxl
     wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
     ws = wb.active
 
     campos = list(CONTAS.values())
     planos = {p: {c: None for c in campos} for p in TODOS_PLANOS}
     plano_atual = None
-    IDX_TOTAL = 42  # coluna 43 em 0-based
+    IDX_TOTAL = 42
 
     for row in ws.iter_rows(values_only=True):
         if len(row) < 9:
             continue
-
-        # Linha de identificação: col 2 (idx 1) contém 'Função' ou 'Funcao'
         cell_b = str(row[1] or '').lower()
         if 'fun' in cell_b and row[8]:
             novo = _detectar_plano_xlsx(row[8], row[5])
             if novo:
                 plano_atual = novo
             continue
-
-        # Linha de conta: col 1 (idx 0) tem o código
         if plano_atual and row[0]:
             conta = str(row[0]).strip()
             if conta in CONTAS:
@@ -140,7 +137,6 @@ def _parse_xlsx(filepath) -> dict:
                     if isinstance(valor, (int, float)):
                         abs_valor = abs(float(valor))
                         if plano_atual == 'PGA':
-                            # PGA tem 3 sub-seções (Alpha/Beta/Gama) — acumula
                             planos['PGA'][campo] = (planos['PGA'][campo] or 0.0) + abs_valor
                         elif planos[plano_atual][campo] is None:
                             planos[plano_atual][campo] = abs_valor
@@ -156,7 +152,7 @@ def parse_balancete(filepath) -> dict:
 
 
 def listar_balancetes(data_dir: Path) -> list:
-    """Retorna todos os arquivos de balancete (XLSX e PDF) ordenados do mais recente ao mais antigo."""
+    """Retorna todos os arquivos de balancete (XLSX e PDF) ordenados por nome."""
     bal_dir = data_dir / 'Balancete'
     if not bal_dir.exists():
         return []
@@ -169,8 +165,7 @@ def achar_balancete(data_dir: Path):
     bal_dir = data_dir / 'Balancete'
     if bal_dir.exists():
         for padrao in ('*.xlsx', '*.pdf'):
-            arquivos = sorted(bal_dir.glob(padrao),
-                              key=lambda x: x.name, reverse=True)
+            arquivos = sorted(bal_dir.glob(padrao), key=lambda x: x.name, reverse=True)
             if arquivos:
                 return arquivos[0]
     return None

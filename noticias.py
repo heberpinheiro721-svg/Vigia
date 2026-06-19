@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import feedparser
 import re
 from datetime import datetime, timezone, timedelta
