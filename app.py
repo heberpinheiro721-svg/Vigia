@@ -500,10 +500,11 @@ if not st.session_state.get("authentication_status"):
         letter-spacing: 0.08em !important;
     }
     [data-testid="stForm"] input {
-        background: rgba(255,255,255,0.06) !important;
-        border: 1px solid rgba(255,255,255,0.14) !important;
+        background: #FFFFFF !important;
+        border: 1px solid rgba(255,255,255,0.30) !important;
         border-radius: 8px !important;
-        color: #FFFFFF !important;
+        color: #0F1E33 !important;
+        font-weight: 700 !important;
         font-size: 0.95rem !important;
     }
     [data-testid="stForm"] input:focus {
