@@ -1624,11 +1624,20 @@ elif pagina == 'Posição Financeira':
         y_min = min(validos) * 0.97
         y_max = max(validos) * 1.15
         fig = go.Figure()
+        # Polígono fechado manualmente: evita artefato de linha do fill='tozeroy'
+        fig.add_trace(go.Scatter(
+            x=list(datas) + list(reversed(datas)),
+            y=list(valores) + [y_min] * len(datas),
+            fill='toself', fillcolor=fill_cor,
+            line=dict(width=0, color='rgba(0,0,0,0)'),
+            showlegend=False, hoverinfo='skip',
+        ))
+        # Linha dos dados por cima
         fig.add_trace(go.Scatter(
             x=datas, y=valores,
-            mode='lines', name=titulo,
+            mode='lines',
             line=dict(color=cor, width=2.5),
-            fill='tozeroy', fillcolor=fill_cor,
+            showlegend=False,
             hovertemplate=f'<b>{hover_label}</b><br>%{{x}}<br>{prefixo} %{{y:,.0f}}<extra></extra>',
         ))
         fig.update_layout(
