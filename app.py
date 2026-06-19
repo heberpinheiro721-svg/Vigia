@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 import pickle
 import calendar as _calendar_app
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from parser import load_carteira_s3
@@ -41,8 +41,14 @@ st.set_page_config(
 
 PL_DEFAULT   = 2_107_321_289.97
 _hoje        = date.today()
-_ult_dia     = _calendar_app.monthrange(_hoje.year, _hoje.month)[1]
-DATA_DEFAULT = f"{_ult_dia:02d}/{_hoje.month:02d}/{_hoje.year}"
+# Último dia útil do mês anterior
+_prev_mes    = _hoje.month - 1 or 12
+_prev_ano    = _hoje.year if _hoje.month > 1 else _hoje.year - 1
+_ult_cal     = _calendar_app.monthrange(_prev_ano, _prev_mes)[1]
+_ult_util    = date(_prev_ano, _prev_mes, _ult_cal)
+while _ult_util.weekday() >= 5:   # 5=sáb, 6=dom → recua para sexta
+    _ult_util -= timedelta(days=1)
+DATA_DEFAULT = _ult_util.strftime("%d/%m/%Y")
 COR  = {'verde': '#27AE60', 'amarelo': '#E67E22', 'vermelho': '#E74C3C'}
 AZUL = '#1B3A6B'
 
