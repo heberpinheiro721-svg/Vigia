@@ -1,0 +1,280 @@
+from __future__ import annotations
+
+from pathlib import Path
+from datetime import datetime
+from io import BytesIO
+
+
+def listar_posicoes(data_dir: Path) -> list:
+    pos_dir = data_dir / 'Posição Financeira'
+    if not pos_dir.exists():
+        return []
+    return sorted(pos_dir.glob('*.xlsx'), key=lambda x: x.name, reverse=True)
+
+
+def _num(v) -> float:
+    if v is None:
+        return 0.0
+    try:
+        return float(v)
+    except Exception:
+        return 0.0
+
+
+def parse_posicao(filepath: Path) -> dict:
+    import openpyxl
+    wb = openpyxl.load_workbook(filepath, data_only=True)
+
+    # ── QUADRO ────────────────────────────────────────────────────────────────
+    ws = wb['QUADRO']
+    rows = list(ws.iter_rows(values_only=True))
+
+    def bloco(r_bancos, r_aplic, r_total, c0, c1, c2, c3, c4):
+        def parse(r):
+            return {
+                'valor':       _num(rows[r][c0]),
+                'semanal':     _num(rows[r][c1]),
+                'mensal':      _num(rows[r][c2]),
+                'trimestral':  _num(rows[r][c3]),
+                '12m':         _num(rows[r][c4]),
+            }
+        return {
+            'bancos':     parse(r_bancos),
+            'aplicacoes': parse(r_aplic),
+            'total':      parse(r_total),
+        }
+
+    # IAJA: L8=idx7, L9=idx8, L11=idx10  — cols D,E,F,G,H = 3,4,5,6,7
+    iaja         = bloco(7,  8,  10, 3, 4, 5, 6, 7)
+    # PPG:  mesmas linhas — cols L,M,N,O,P = 11,12,13,14,15
+    ppg          = bloco(7,  8,  10, 11, 12, 13, 14, 15)
+    # ASSISTENCIAL: L17=idx16, L18=idx17, L20=idx19 — cols D-H
+    assistencial = bloco(16, 17, 19, 3, 4, 5, 6, 7)
+    # CONSOLIDADO: mesmas linhas — cols L-P
+    consolidado  = bloco(16, 17, 19, 11, 12, 13, 14, 15)
+
+    data_ref    = str(rows[6][3]) if rows[6][3] else ''
+    cotacao_usd = _num(rows[20][11])
+
+    # Data do relatório — L59 (idx 58): col O='Brasília', col P=datetime
+    data_relatorio = None
+    for r in rows:
+        if r[14] is not None and 'Bras' in str(r[14]) and isinstance(r[15], datetime):
+            data_relatorio = r[15].date()
+            break
+
+    # ── PREENCHIMENTO ─────────────────────────────────────────────────────────
+    wp = wb['Preenchimento']
+    prows = list(wp.iter_rows(values_only=True))
+
+    # Linha 1 (idx 0): cabeçalho — datas a partir de col D (idx 3)
+    datas_raw = [str(v) for v in prows[0][3:] if v is not None]
+    n = len(datas_raw)
+
+    def serie(row_idx: int) -> list:
+        return [_num(v) for v in prows[row_idx][3:3 + n]]
+
+    # Reversão: Preenchimento vai do mais recente para o mais antigo
+    datas = list(reversed(datas_raw))
+
+    # IAJA Carteiras — L13-L18 = idx 12-17
+    hist_iaja = {
+        'datas':          datas,
+        'Alpha':          list(reversed(serie(12))),
+        'Beta':           list(reversed(serie(13))),
+        'Gama':           list(reversed(serie(14))),
+        'Administrativo': list(reversed(serie(15))),
+        'Empréstimos':    list(reversed(serie(16))),
+        'Total':          list(reversed(serie(17))),
+    }
+
+    # Assistencial Carteiras — L27-L33 = idx 26-32
+    hist_ass = {
+        'datas':     datas,
+        'Bradesco':  list(reversed(serie(26))),
+        'Santander': list(reversed(serie(27))),
+        'Oceana':    list(reversed(serie(28))),
+        'Superbom':  list(reversed(serie(29))),
+        'HAS':       list(reversed(serie(30))),
+        'Convênios': list(reversed(serie(31))),
+        'Total':     list(reversed(serie(32))),
+    }
+
+    # PPG Carteira — L40 = idx 39
+    hist_ppg = {
+        'datas':    datas,
+        'Carteira': list(reversed(serie(39))),
+    }
+
+    return {
+        'data_ref':       data_ref,
+        'data_relatorio': data_relatorio,
+        'iaja':           iaja,
+        'ppg':            ppg,
+        'assistencial':   assistencial,
+        'consolidado':    consolidado,
+        'cotacao_usd':    cotacao_usd,
+        'hist_iaja':      hist_iaja,
+        'hist_ass':       hist_ass,
+        'hist_ppg':       hist_ppg,
+    }
+
+
+def gerar_pdf_posicao(dados: dict) -> bytes:
+    """Gera PDF da Posição Financeira com cabeçalho VIGIA."""
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
+                                    Paragraph, Spacer, HRFlowable, KeepInFrame)
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+
+    buf = BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=landscape(A4),
+        topMargin=1.2 * cm, bottomMargin=1.2 * cm,
+        leftMargin=1.8 * cm, rightMargin=1.8 * cm,
+    )
+
+    COR_AZUL   = colors.HexColor('#1B3A6B')
+    COR_LIGHT  = colors.HexColor('#EBF5FB')
+    COR_CINZA  = colors.HexColor('#F5F7FA')
+    COR_VERDE  = colors.HexColor('#1A7A40')
+    COR_VERM   = colors.HexColor('#C0392B')
+    BRANCO     = colors.white
+
+    s_vigia = ParagraphStyle('vigia', fontSize=20, textColor=BRANCO,
+                              fontName='Helvetica-Bold', alignment=TA_LEFT)
+    s_tit   = ParagraphStyle('tit', fontSize=10, textColor=BRANCO,
+                              fontName='Helvetica-Bold', alignment=TA_CENTER,
+                              leading=14)
+    s_nota  = ParagraphStyle('nota', fontSize=7, textColor=colors.grey,
+                              fontName='Helvetica', alignment=TA_RIGHT)
+    s_secao = ParagraphStyle('secao', fontSize=9, textColor=COR_AZUL,
+                              fontName='Helvetica-Bold', alignment=TA_LEFT)
+    s_rod   = ParagraphStyle('rod', fontSize=7, textColor=colors.grey,
+                              fontName='Helvetica', alignment=TA_CENTER)
+
+    story = []
+
+    # ── Cabeçalho ─────────────────────────────────────────────────────────────
+    data_str = (dados['data_relatorio'].strftime('%d/%m/%Y')
+                if dados['data_relatorio'] else '')
+    cab = Table([[
+        Paragraph('VIGIA', s_vigia),
+        Paragraph(
+            'GENERAL CONFERENCE — SOUTH AMERICAN DIVISION<br/>'
+            '<b>IAJA / PPG / ASSISTENCIAL</b>',
+            s_tit,
+        ),
+        Paragraph(
+            f'Posição: {dados["data_ref"]}<br/>'
+            f'Data: {data_str}',
+            s_nota,
+        ),
+    ]], colWidths=['18%', '64%', '18%'])
+    cab.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), COR_AZUL),
+        ('VALIGN',     (0, 0), (-1, -1), 'MIDDLE'),
+        ('PADDING',    (0, 0), (-1, -1), 10),
+    ]))
+    story.append(cab)
+    story.append(Spacer(1, 0.4 * cm))
+
+    # ── Helpers ────────────────────────────────────────────────────────────────
+    def fmt_val(v, moeda='R$'):
+        if abs(v) >= 1e9:
+            return f'{moeda} {v / 1e9:.3f} Bi'
+        if abs(v) >= 1e6:
+            return f'{moeda} {v / 1e6:.2f} Mi'
+        return f'{moeda} {v:,.2f}'
+
+    def fmt_pct(v):
+        if v == 0:
+            return '—'
+        p = v * 100
+        if abs(p) > 9999:
+            return f'{p:+.0f}%'
+        return f'{p:+.2f}%'
+
+    def cor_pct(v):
+        if v > 0:
+            return COR_VERDE
+        if v < 0:
+            return COR_VERM
+        return colors.grey
+
+    def tabela_bloco(titulo, bloco, moeda='R$'):
+        cab_row = ['', 'Posição', 'Semanal', 'Mensal', 'Trimestral', '12 Meses']
+        linhas = [
+            ('Bancos',     bloco['bancos']),
+            ('Aplicações', bloco['aplicacoes']),
+            ('Total',      bloco['total']),
+        ]
+        data = [cab_row]
+        for nome, d in linhas:
+            data.append([
+                nome,
+                fmt_val(d['valor'], moeda),
+                fmt_pct(d['semanal']),
+                fmt_pct(d['mensal']),
+                fmt_pct(d['trimestral']),
+                fmt_pct(d['12m']),
+            ])
+
+        cw = [2.3 * cm, 3.2 * cm, 1.8 * cm, 1.8 * cm, 2.2 * cm, 2.2 * cm]
+        t = Table(data, colWidths=cw)
+
+        style_cmds = [
+            ('BACKGROUND', (0, 0), (-1, 0), COR_AZUL),
+            ('TEXTCOLOR',  (0, 0), (-1, 0), BRANCO),
+            ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE',   (0, 0), (-1, -1), 7.5),
+            ('ALIGN',      (1, 0), (-1, -1), 'RIGHT'),
+            ('ALIGN',      (0, 0), (0, -1), 'LEFT'),
+            ('BACKGROUND', (0, 3), (-1, 3), COR_LIGHT),
+            ('FONTNAME',   (0, 3), (-1, 3), 'Helvetica-Bold'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, 2), [BRANCO, COR_CINZA]),
+            ('GRID',  (0, 0), (-1, -1), 0.3, colors.HexColor('#D0D7E3')),
+            ('PADDING', (0, 0), (-1, -1), 4),
+        ]
+        for ri, (_, d) in enumerate(linhas, start=1):
+            for ci, key in enumerate(['semanal', 'mensal', 'trimestral', '12m'], start=2):
+                v = d[key]
+                if v != 0:
+                    style_cmds += [
+                        ('TEXTCOLOR', (ci, ri), (ci, ri), cor_pct(v)),
+                        ('FONTNAME',  (ci, ri), (ci, ri), 'Helvetica-Bold'),
+                    ]
+        t.setStyle(TableStyle(style_cmds))
+
+        return [Paragraph(titulo, s_secao), Spacer(1, 0.1 * cm), t]
+
+    # ── 4 tabelas em 2×2 ──────────────────────────────────────────────────────
+    w = 13.5 * cm
+    b_iaja  = tabela_bloco(f'IAJA — Variação em Reais · {dados["data_ref"]}', dados['iaja'])
+    b_ppg   = tabela_bloco(f'PPG — Variação em Dólares · US$ {dados["cotacao_usd"]:.2f}', dados['ppg'], 'US$')
+    b_ass   = tabela_bloco('ASSISTENCIAL — Variação em Reais', dados['assistencial'])
+    b_cons  = tabela_bloco('CONSOLIDADO — Variação em Reais', dados['consolidado'])
+
+    linha1 = Table([[KeepInFrame(w, 15*cm, b_iaja), KeepInFrame(w, 15*cm, b_ppg)]],
+                   colWidths=[w + 0.3*cm, w + 0.3*cm])
+    linha2 = Table([[KeepInFrame(w, 15*cm, b_ass), KeepInFrame(w, 15*cm, b_cons)]],
+                   colWidths=[w + 0.3*cm, w + 0.3*cm])
+
+    story += [linha1, Spacer(1, 0.4*cm), linha2]
+
+    # ── Rodapé ────────────────────────────────────────────────────────────────
+    story.append(Spacer(1, 0.5 * cm))
+    story.append(HRFlowable(width='100%', thickness=0.5, color=COR_AZUL))
+    story.append(Spacer(1, 0.15 * cm))
+    story.append(Paragraph(
+        f'Brasília, {data_str}  ·  Tesouraria DSA  ·  '
+        f'Gerado pelo <b>VIGIA</b> — Sistema de Análise de Investimentos IAJA',
+        s_rod,
+    ))
+
+    doc.build(story)
+    return buf.getvalue()

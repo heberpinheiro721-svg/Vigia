@@ -21,6 +21,7 @@ from historico import salvar_snapshot, carregar_historico, historico_para_datafr
 from performance import load_cotas, ultima_posicao, achar_cotas_csv
 from balancete_parser import parse_balancete, achar_balancete, listar_balancetes
 from evolucao_mensal import montar_tabela_mensal, tabela_para_texto
+from posicao_financeira import listar_posicoes, parse_posicao, gerar_pdf_posicao
 from bcb_api import get_benchmarks
 from analytics import (calcular_risco_retorno, concentracao_gestores,
                        calcular_meta_atuarial, simular_realocacao,
@@ -645,6 +646,7 @@ with st.sidebar:
     MODULOS = {
         "📊 Dashboard":           "Dashboard",
         "📅 Evolução Mensal":     "Evolução Mensal",
+        "💼 Posição Financeira":  "Posição Financeira",
         "📉 Performance":         "Performance",
         "🏆 Comparativo de Mercado": "Comparativo",
         "📈 Risco Avançado":      "Risco Avançado",
@@ -1473,6 +1475,241 @@ Seja direto e factual. Use linguagem adequada para conselheiros não técnicos."
                 except Exception as _e:
                     st.error(f"Erro na análise IA: {_e}")
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MÓDULO: POSIÇÃO FINANCEIRA
+# ══════════════════════════════════════════════════════════════════════════════
+elif pagina == 'Posição Financeira':
+    st.markdown('<div class="secao-titulo">💼 Posição Financeira</div>', unsafe_allow_html=True)
+
+    arquivos_pos = listar_posicoes(data_dir)
+    if not arquivos_pos:
+        st.info("Nenhum arquivo encontrado em `data/Posição Financeira/`. Adicione um XLSX do relatório semanal.")
+        st.stop()
+
+    nomes = [p.name for p in arquivos_pos]
+    sel_idx = st.selectbox("Selecionar relatório:", range(len(nomes)),
+                           format_func=lambda i: nomes[i], key='pos_fin_sel')
+    arquivo_sel = arquivos_pos[sel_idx]
+
+    @st.cache_data(ttl=86400, show_spinner=False)
+    def _cached_posicao(path_str: str, mtime: float):
+        return parse_posicao(Path(path_str))
+
+    with st.spinner("Lendo relatório..."):
+        d = _cached_posicao(str(arquivo_sel), arquivo_sel.stat().st_mtime)
+
+    data_rel_str = d['data_relatorio'].strftime('%d/%m/%Y') if d['data_relatorio'] else ''
+
+    # ── Cabeçalho institucional ───────────────────────────────────────────────
+    st.markdown(f"""
+    <div style="background:#1B3A6B;border-radius:12px;padding:16px 24px;margin-bottom:20px;
+                display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:0.68rem;color:#8AAECB;letter-spacing:0.10em;text-transform:uppercase;">
+          General Conference — South American Division</div>
+        <div style="font-size:1.2rem;font-weight:800;color:#FFF;margin-top:2px;">
+          IAJA / PPG / ASSISTENCIAL</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:0.72rem;color:#8AAECB;">Posição de referência</div>
+        <div style="font-size:1.1rem;font-weight:700;color:#FFF;">{d['data_ref']}</div>
+        <div style="font-size:0.68rem;color:#8AAECB;margin-top:2px;">{data_rel_str}</div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Helper: card de tabela ────────────────────────────────────────────────
+    def _fmt_val(v, moeda='R$'):
+        if abs(v) >= 1e9:
+            return f'{moeda} {v/1e9:.3f} Bi'
+        if abs(v) >= 1e6:
+            return f'{moeda} {v/1e6:.2f} Mi'
+        return f'{moeda} {v:,.2f}'
+
+    def _fmt_pct(v):
+        if v == 0:
+            return '<span style="color:#8AAECB;">—</span>'
+        p = v * 100
+        cor = '#1A7A40' if p > 0 else '#C0392B'
+        txt = f'{p:+.2f}%' if abs(p) < 9999 else f'{p:+.0f}%'
+        return f'<span style="color:{cor};font-weight:700;">{txt}</span>'
+
+    def _card_tabela(titulo, bloco, moeda='R$', moeda_label='Variação em Reais'):
+        linhas_html = ''
+        nomes_lin = [('Bancos', bloco['bancos']),
+                     ('Aplicações', bloco['aplicacoes']),
+                     ('Total', bloco['total'])]
+        for i, (nome, d_lin) in enumerate(nomes_lin):
+            bg = '#F5F7FA' if i % 2 == 0 else '#FFFFFF'
+            peso = 'font-weight:700;background:#EBF5FB;' if nome == 'Total' else ''
+            linhas_html += f"""
+            <tr style="background:{bg};{peso}">
+              <td style="padding:7px 10px;font-size:0.80rem;color:#1A2E46;font-weight:{'700' if nome=='Total' else '400'};">{nome}</td>
+              <td style="padding:7px 10px;font-size:0.80rem;text-align:right;color:#1A2E46;">{_fmt_val(d_lin['valor'], moeda)}</td>
+              <td style="padding:7px 10px;font-size:0.80rem;text-align:right;">{_fmt_pct(d_lin['semanal'])}</td>
+              <td style="padding:7px 10px;font-size:0.80rem;text-align:right;">{_fmt_pct(d_lin['mensal'])}</td>
+              <td style="padding:7px 10px;font-size:0.80rem;text-align:right;">{_fmt_pct(d_lin['trimestral'])}</td>
+              <td style="padding:7px 10px;font-size:0.80rem;text-align:right;">{_fmt_pct(d_lin['12m'])}</td>
+            </tr>"""
+        return f"""
+        <div style="background:#FFF;border-radius:10px;border:1px solid #E2E9F2;
+                    box-shadow:0 1px 5px rgba(0,0,0,0.05);margin-bottom:6px;overflow:hidden;">
+          <div style="background:#1B3A6B;padding:8px 14px;">
+            <div style="font-size:0.82rem;font-weight:700;color:#FFF;">{titulo}</div>
+            <div style="font-size:0.65rem;color:#8AAECB;">{moeda_label}</div>
+          </div>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="background:#EEF3FA;">
+                <th style="padding:6px 10px;font-size:0.72rem;color:#6B7E96;text-align:left;font-weight:600;">Item</th>
+                <th style="padding:6px 10px;font-size:0.72rem;color:#6B7E96;text-align:right;font-weight:600;">Posição</th>
+                <th style="padding:6px 10px;font-size:0.72rem;color:#6B7E96;text-align:right;font-weight:600;">Semanal</th>
+                <th style="padding:6px 10px;font-size:0.72rem;color:#6B7E96;text-align:right;font-weight:600;">Mensal</th>
+                <th style="padding:6px 10px;font-size:0.72rem;color:#6B7E96;text-align:right;font-weight:600;">Trimestral</th>
+                <th style="padding:6px 10px;font-size:0.72rem;color:#6B7E96;text-align:right;font-weight:600;">12 Meses</th>
+              </tr>
+            </thead>
+            <tbody>{linhas_html}</tbody>
+          </table>
+        </div>"""
+
+    # ── 4 tabelas em 2 colunas ────────────────────────────────────────────────
+    col_l, col_r = st.columns(2, gap="medium")
+
+    with col_l:
+        st.markdown(_card_tabela('IAJA', d['iaja']), unsafe_allow_html=True)
+        st.markdown(_card_tabela('ASSISTENCIAL', d['assistencial']), unsafe_allow_html=True)
+
+    with col_r:
+        st.markdown(
+            _card_tabela(f'PPG · Cotação US$ {d["cotacao_usd"]:.2f}',
+                         d['ppg'], moeda='US$', moeda_label='Variação em Dólares'),
+            unsafe_allow_html=True,
+        )
+        st.markdown(_card_tabela('CONSOLIDADO', d['consolidado']), unsafe_allow_html=True)
+
+    # ── Gráficos históricos ───────────────────────────────────────────────────
+    st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+      <div style="width:4px;height:22px;background:#2472B5;border-radius:4px;"></div>
+      <div style="font-size:0.90rem;font-weight:700;color:#0F1E33;">Evolução Histórica das Carteiras</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    import plotly.graph_objects as go
+
+    CORES_PLANOS = {
+        'Alpha':          '#1B3A6B',
+        'Beta':           '#2472B5',
+        'Gama':           '#3498DB',
+        'Administrativo': '#5DADE2',
+        'Empréstimos':    '#AED6F1',
+        'Total':          '#E67E22',
+    }
+    CORES_ASS = {
+        'Bradesco':  '#27AE60',
+        'Santander': '#E74C3C',
+        'Oceana':    '#8E44AD',
+        'Superbom':  '#F39C12',
+        'HAS':       '#1ABC9C',
+        'Convênios': '#2980B9',
+        'Total':     '#E67E22',
+    }
+
+    g_col1, g_col2 = st.columns(2, gap="medium")
+
+    with g_col1:
+        st.markdown("**IAJA — Evolução por Plano**", unsafe_allow_html=False)
+        hi = d['hist_iaja']
+        fig_iaja = go.Figure()
+        for nome, cor in CORES_PLANOS.items():
+            if nome == 'Total':
+                continue
+            fig_iaja.add_trace(go.Scatter(
+                x=hi['datas'], y=hi[nome],
+                mode='lines', name=nome,
+                line=dict(color=cor, width=2),
+                hovertemplate=f'<b>{nome}</b><br>%{{x}}<br>R$ %{{y:,.0f}}<extra></extra>',
+            ))
+        fig_iaja.update_layout(
+            height=320, margin=dict(t=10, b=40, l=10, r=10),
+            legend=dict(orientation='h', y=-0.25, x=0.5, xanchor='center', font=dict(size=10)),
+            xaxis=dict(showgrid=False, tickfont=dict(size=9), tickangle=45),
+            yaxis=dict(showgrid=True, gridcolor='#F0F0F0', tickformat=',.0f',
+                       tickprefix='R$ ', tickfont=dict(size=9)),
+            plot_bgcolor='white', paper_bgcolor='white',
+            hovermode='x unified',
+        )
+        st.plotly_chart(fig_iaja, use_container_width=True, key='fig_iaja_hist')
+
+    with g_col2:
+        st.markdown("**ASSISTENCIAL — Evolução por Gestor**", unsafe_allow_html=False)
+        ha = d['hist_ass']
+        fig_ass = go.Figure()
+        for nome, cor in CORES_ASS.items():
+            if nome == 'Total':
+                continue
+            fig_ass.add_trace(go.Scatter(
+                x=ha['datas'], y=ha[nome],
+                mode='lines', name=nome,
+                line=dict(color=cor, width=2),
+                hovertemplate=f'<b>{nome}</b><br>%{{x}}<br>R$ %{{y:,.0f}}<extra></extra>',
+            ))
+        fig_ass.update_layout(
+            height=320, margin=dict(t=10, b=40, l=10, r=10),
+            legend=dict(orientation='h', y=-0.25, x=0.5, xanchor='center', font=dict(size=10)),
+            xaxis=dict(showgrid=False, tickfont=dict(size=9), tickangle=45),
+            yaxis=dict(showgrid=True, gridcolor='#F0F0F0', tickformat=',.0f',
+                       tickprefix='R$ ', tickfont=dict(size=9)),
+            plot_bgcolor='white', paper_bgcolor='white',
+            hovermode='x unified',
+        )
+        st.plotly_chart(fig_ass, use_container_width=True, key='fig_ass_hist')
+
+    # Total IAJA + Consolidado
+    st.markdown("**IAJA Total vs Consolidado (IAJA + Assistencial)**")
+    fig_cons = go.Figure()
+    fig_cons.add_trace(go.Scatter(
+        x=d['hist_iaja']['datas'], y=d['hist_iaja']['Total'],
+        mode='lines', name='IAJA Total',
+        line=dict(color='#1B3A6B', width=2.5),
+        fill='tozeroy', fillcolor='rgba(27,58,107,0.07)',
+        hovertemplate='<b>IAJA</b><br>%{x}<br>R$ %{y:,.0f}<extra></extra>',
+    ))
+    # Consolidado = IAJA + Assistencial
+    total_cons = [a + b for a, b in zip(d['hist_iaja']['Total'], d['hist_ass']['Total'])]
+    fig_cons.add_trace(go.Scatter(
+        x=d['hist_iaja']['datas'], y=total_cons,
+        mode='lines', name='Consolidado (IAJA+ASS)',
+        line=dict(color='#E67E22', width=2.5, dash='dot'),
+        hovertemplate='<b>Consolidado</b><br>%{x}<br>R$ %{y:,.0f}<extra></extra>',
+    ))
+    fig_cons.update_layout(
+        height=280, margin=dict(t=10, b=40, l=10, r=10),
+        legend=dict(orientation='h', y=-0.25, x=0.5, xanchor='center', font=dict(size=10)),
+        xaxis=dict(showgrid=False, tickfont=dict(size=9), tickangle=45),
+        yaxis=dict(showgrid=True, gridcolor='#F0F0F0', tickformat=',.0f',
+                   tickprefix='R$ ', tickfont=dict(size=9)),
+        plot_bgcolor='white', paper_bgcolor='white',
+        hovermode='x unified',
+    )
+    st.plotly_chart(fig_cons, use_container_width=True, key='fig_cons_hist')
+
+    # ── PDF ───────────────────────────────────────────────────────────────────
+    st.markdown("<hr style='margin:20px 0;border-color:#E2E9F2;'>", unsafe_allow_html=True)
+    if st.button("📄 Gerar PDF da Posição Financeira", type="primary", key='btn_pdf_pos'):
+        with st.spinner("Gerando PDF..."):
+            pdf_bytes = gerar_pdf_posicao(d)
+        nome_pdf = f"Posicao_Financeira_{d['data_ref'].replace('/', '-')}.pdf"
+        st.download_button(
+            label="⬇️ Baixar PDF",
+            data=pdf_bytes,
+            file_name=nome_pdf,
+            mime="application/pdf",
+            key='dl_pdf_pos',
+        )
 
 # ══════════════════════════════════════════════════════════════════════════════
 # MÓDULO: PERFORMANCE
