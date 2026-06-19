@@ -109,13 +109,70 @@ def parse_posicao(filepath: Path) -> dict:
     }
 
 
+def _chart_png(titulo: str, datas: list, valores: list, cor: str,
+               prefixo: str, w_in: float = 5.0, h_in: float = 1.8) -> bytes | None:
+    """Gera PNG do gráfico via matplotlib."""
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import matplotlib.ticker as mticker
+
+        validos = [v for v in valores if v and v > 0]
+        if not validos:
+            return None
+
+        y_min  = min(validos) * 0.97
+        y_last = valores[-1]
+        y_max  = max(y_min + (y_last - y_min) / 0.80, max(validos) * 1.03)
+        n      = len(valores)
+        x      = list(range(n))
+
+        fig, ax = plt.subplots(figsize=(w_in, h_in), dpi=150)
+        ax.fill_between(x, y_min, valores, alpha=0.14, color=cor)
+        ax.plot(x, valores, color=cor, linewidth=1.4)
+        ax.set_xlim(0, n - 1)
+        ax.set_ylim(y_min, y_max)
+
+        step = max(1, n // 10)
+        ax.set_xticks(x[::step])
+        ax.set_xticklabels(datas[::step], rotation=45, ha='right', fontsize=5)
+
+        def _fmt(v, _):
+            if abs(v) >= 1e9: return f'{prefixo} {v/1e9:.2f}Bi'
+            if abs(v) >= 1e6: return f'{prefixo} {v/1e6:.0f}Mi'
+            return f'{prefixo} {v:,.0f}'
+
+        ax.yaxis.set_major_formatter(mticker.FuncFormatter(_fmt))
+        ax.tick_params(axis='y', labelsize=5)
+        ax.set_title(titulo, fontsize=6.5, color='#1A2E46', fontweight='bold', pad=3)
+        ax.set_facecolor('#FFFFFF')
+        fig.patch.set_facecolor('#FFFFFF')
+        ax.grid(False)
+        for sp in ['top', 'right']:
+            ax.spines[sp].set_visible(False)
+        for sp in ['bottom', 'left']:
+            ax.spines[sp].set_color('#CCCCCC')
+        fig.tight_layout(pad=0.4)
+
+        buf = BytesIO()
+        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight',
+                    facecolor='white', edgecolor='none')
+        plt.close(fig)
+        buf.seek(0)
+        return buf.read()
+    except Exception:
+        return None
+
+
 def gerar_pdf_posicao(dados: dict) -> bytes:
     """Gera PDF da Posição Financeira com cabeçalho VIGIA."""
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib import colors
     from reportlab.lib.units import cm
     from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
-                                    Paragraph, Spacer, HRFlowable, KeepInFrame)
+                                    Paragraph, Spacer, HRFlowable, KeepInFrame,
+                                    Image as RLImage)
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
@@ -254,6 +311,65 @@ def gerar_pdf_posicao(dados: dict) -> bytes:
                    colWidths=[w + 0.3*cm, w + 0.3*cm])
 
     story += [linha1, Spacer(1, 0.4*cm), linha2]
+
+    # ── Cotação US$ em destaque ───────────────────────────────────────────────
+    story.append(Spacer(1, 0.35 * cm))
+    s_cot_label = ParagraphStyle('cotl', fontSize=7, textColor=BRANCO,
+                                 fontName='Helvetica', alignment=TA_RIGHT)
+    s_cot_val   = ParagraphStyle('cotv', fontSize=11, textColor=BRANCO,
+                                 fontName='Helvetica-Bold', alignment=TA_RIGHT)
+    cot_tab = Table([[
+        Paragraph('Evolução Histórica', ParagraphStyle(
+            'eh', fontSize=9, textColor=COR_AZUL,
+            fontName='Helvetica-Bold', alignment=TA_LEFT)),
+        Table([[
+            Paragraph('COTAÇÃO US$', s_cot_label),
+            Paragraph(f'R$ {dados["cotacao_usd"]:.2f}', s_cot_val),
+        ]], colWidths=[2.2*cm, 2.0*cm], rowHeights=[0.6*cm],
+            style=TableStyle([
+                ('BACKGROUND', (0,0), (-1,-1), COR_AZUL),
+                ('ALIGN',      (0,0), (-1,-1), 'RIGHT'),
+                ('VALIGN',     (0,0), (-1,-1), 'MIDDLE'),
+                ('PADDING',    (0,0), (-1,-1), 4),
+                ('ROUNDEDCORNERS', [4]),
+            ])),
+    ]], colWidths=['82%', '18%'])
+    cot_tab.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('PADDING', (0,0), (-1,-1), 0),
+    ]))
+    story.append(cot_tab)
+    story.append(Spacer(1, 0.25 * cm))
+
+    # ── Gráficos históricos ───────────────────────────────────────────────────
+    datas  = dados['hist_datas']
+    cw2    = 13.0 * cm   # largura de cada coluna (2 colunas)
+    ch2    = 3.2  * cm   # altura dos 2 gráficos superiores
+    ch3    = 3.4  * cm   # altura do gráfico consolidado
+
+    png_brasil = _chart_png('Brasil (IAJA + Assistencial)', datas,
+                            dados['hist_brasil'], '#1B3A6B', 'R$',
+                            w_in=5.1, h_in=1.8)
+    png_ppg    = _chart_png('PPG', datas,
+                            dados['hist_ppg'], '#27AE60', 'US$',
+                            w_in=5.1, h_in=1.8)
+    png_cons   = _chart_png(
+        f'IAJA Consolidado em R$ (cotação US$ {dados["cotacao_usd"]:.2f})',
+        datas, dados['hist_consolidado'], '#2472B5', 'R$',
+        w_in=10.5, h_in=1.9)
+
+    def _img(png, w, h):
+        return RLImage(BytesIO(png), width=w, height=h) if png else Spacer(w, h)
+
+    linha_g1 = Table(
+        [[_img(png_brasil, cw2, ch2), _img(png_ppg, cw2, ch2)]],
+        colWidths=[cw2 + 0.1*cm, cw2 + 0.1*cm],
+    )
+    story.append(linha_g1)
+    story.append(Spacer(1, 0.2 * cm))
+
+    if png_cons:
+        story.append(RLImage(BytesIO(png_cons), width=26.1*cm, height=ch3))
 
     # ── Rodapé ────────────────────────────────────────────────────────────────
     story.append(Spacer(1, 0.5 * cm))
