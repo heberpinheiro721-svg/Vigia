@@ -77,34 +77,20 @@ def parse_posicao(filepath: Path) -> dict:
     # Reversão: Preenchimento vai do mais recente para o mais antigo
     datas = list(reversed(datas_raw))
 
-    # IAJA Carteiras — L13-L18 = idx 12-17
-    hist_iaja = {
-        'datas':          datas,
-        'Alpha':          list(reversed(serie(12))),
-        'Beta':           list(reversed(serie(13))),
-        'Gama':           list(reversed(serie(14))),
-        'Administrativo': list(reversed(serie(15))),
-        'Empréstimos':    list(reversed(serie(16))),
-        'Total':          list(reversed(serie(17))),
-    }
+    def rev(idx): return list(reversed(serie(idx)))
 
-    # Assistencial Carteiras — L27-L33 = idx 26-32
-    hist_ass = {
-        'datas':     datas,
-        'Bradesco':  list(reversed(serie(26))),
-        'Santander': list(reversed(serie(27))),
-        'Oceana':    list(reversed(serie(28))),
-        'Superbom':  list(reversed(serie(29))),
-        'HAS':       list(reversed(serie(30))),
-        'Convênios': list(reversed(serie(31))),
-        'Total':     list(reversed(serie(32))),
-    }
+    # IAJA Total histórico = Bancos (L10=idx9) + Total Aplicações (L18=idx17)
+    bancos_iaja  = rev(9)
+    aplic_iaja   = rev(17)
+    total_iaja_h = [b + a for b, a in zip(bancos_iaja, aplic_iaja)]
 
-    # PPG Carteira — L40 = idx 39
-    hist_ppg = {
-        'datas':    datas,
-        'Carteira': list(reversed(serie(39))),
-    }
+    # PPG Total histórico = Bancos (L37=idx36) + Carteira (L40=idx39)
+    bancos_ppg  = rev(36)
+    cart_ppg    = rev(39)
+    total_ppg_h = [b + c for b, c in zip(bancos_ppg, cart_ppg)]
+
+    hist_iaja = {'datas': datas, 'Total': total_iaja_h}
+    hist_ppg  = {'datas': datas, 'Total': total_ppg_h}
 
     return {
         'data_ref':       data_ref,
@@ -115,7 +101,6 @@ def parse_posicao(filepath: Path) -> dict:
         'consolidado':    consolidado,
         'cotacao_usd':    cotacao_usd,
         'hist_iaja':      hist_iaja,
-        'hist_ass':       hist_ass,
         'hist_ppg':       hist_ppg,
     }
 

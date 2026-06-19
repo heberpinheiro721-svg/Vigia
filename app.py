@@ -1600,108 +1600,56 @@ elif pagina == 'Posição Financeira':
     st.markdown("""
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
       <div style="width:4px;height:22px;background:#2472B5;border-radius:4px;"></div>
-      <div style="font-size:0.90rem;font-weight:700;color:#0F1E33;">Evolução Histórica das Carteiras</div>
+      <div style="font-size:0.90rem;font-weight:700;color:#0F1E33;">Evolução Histórica</div>
     </div>
     """, unsafe_allow_html=True)
 
     import plotly.graph_objects as go
 
-    CORES_PLANOS = {
-        'Alpha':          '#1B3A6B',
-        'Beta':           '#2472B5',
-        'Gama':           '#3498DB',
-        'Administrativo': '#5DADE2',
-        'Empréstimos':    '#AED6F1',
-        'Total':          '#E67E22',
-    }
-    CORES_ASS = {
-        'Bradesco':  '#27AE60',
-        'Santander': '#E74C3C',
-        'Oceana':    '#8E44AD',
-        'Superbom':  '#F39C12',
-        'HAS':       '#1ABC9C',
-        'Convênios': '#2980B9',
-        'Total':     '#E67E22',
-    }
+    def _layout_graf(fig, tickprefix='R$ ', height=340):
+        fig.update_layout(
+            height=height, margin=dict(t=15, b=50, l=10, r=10),
+            showlegend=False,
+            xaxis=dict(showgrid=False, tickfont=dict(size=9), tickangle=45),
+            yaxis=dict(showgrid=True, gridcolor='#F0F0F0', tickformat=',.0f',
+                       tickprefix=tickprefix, tickfont=dict(size=9)),
+            plot_bgcolor='white', paper_bgcolor='white',
+            hovermode='x unified',
+        )
 
     g_col1, g_col2 = st.columns(2, gap="medium")
 
     with g_col1:
-        st.markdown("**IAJA — Evolução por Plano**", unsafe_allow_html=False)
+        st.markdown("""
+        <div style="font-size:0.85rem;font-weight:700;color:#1B3A6B;margin-bottom:4px;">
+          Recursos IAJA — Total (R$)</div>""", unsafe_allow_html=True)
         hi = d['hist_iaja']
         fig_iaja = go.Figure()
-        for nome, cor in CORES_PLANOS.items():
-            if nome == 'Total':
-                continue
-            fig_iaja.add_trace(go.Scatter(
-                x=hi['datas'], y=hi[nome],
-                mode='lines', name=nome,
-                line=dict(color=cor, width=2),
-                hovertemplate=f'<b>{nome}</b><br>%{{x}}<br>R$ %{{y:,.0f}}<extra></extra>',
-            ))
-        fig_iaja.update_layout(
-            height=320, margin=dict(t=10, b=40, l=10, r=10),
-            legend=dict(orientation='h', y=-0.25, x=0.5, xanchor='center', font=dict(size=10)),
-            xaxis=dict(showgrid=False, tickfont=dict(size=9), tickangle=45),
-            yaxis=dict(showgrid=True, gridcolor='#F0F0F0', tickformat=',.0f',
-                       tickprefix='R$ ', tickfont=dict(size=9)),
-            plot_bgcolor='white', paper_bgcolor='white',
-            hovermode='x unified',
-        )
+        fig_iaja.add_trace(go.Scatter(
+            x=hi['datas'], y=hi['Total'],
+            mode='lines', name='IAJA',
+            line=dict(color='#1B3A6B', width=2.5),
+            fill='tozeroy', fillcolor='rgba(27,58,107,0.08)',
+            hovertemplate='<b>IAJA</b><br>%{x}<br>R$ %{y:,.0f}<extra></extra>',
+        ))
+        _layout_graf(fig_iaja, tickprefix='R$ ')
         st.plotly_chart(fig_iaja, use_container_width=True, key='fig_iaja_hist')
 
     with g_col2:
-        st.markdown("**ASSISTENCIAL — Evolução por Gestor**", unsafe_allow_html=False)
-        ha = d['hist_ass']
-        fig_ass = go.Figure()
-        for nome, cor in CORES_ASS.items():
-            if nome == 'Total':
-                continue
-            fig_ass.add_trace(go.Scatter(
-                x=ha['datas'], y=ha[nome],
-                mode='lines', name=nome,
-                line=dict(color=cor, width=2),
-                hovertemplate=f'<b>{nome}</b><br>%{{x}}<br>R$ %{{y:,.0f}}<extra></extra>',
-            ))
-        fig_ass.update_layout(
-            height=320, margin=dict(t=10, b=40, l=10, r=10),
-            legend=dict(orientation='h', y=-0.25, x=0.5, xanchor='center', font=dict(size=10)),
-            xaxis=dict(showgrid=False, tickfont=dict(size=9), tickangle=45),
-            yaxis=dict(showgrid=True, gridcolor='#F0F0F0', tickformat=',.0f',
-                       tickprefix='R$ ', tickfont=dict(size=9)),
-            plot_bgcolor='white', paper_bgcolor='white',
-            hovermode='x unified',
-        )
-        st.plotly_chart(fig_ass, use_container_width=True, key='fig_ass_hist')
-
-    # Total IAJA + Consolidado
-    st.markdown("**IAJA Total vs Consolidado (IAJA + Assistencial)**")
-    fig_cons = go.Figure()
-    fig_cons.add_trace(go.Scatter(
-        x=d['hist_iaja']['datas'], y=d['hist_iaja']['Total'],
-        mode='lines', name='IAJA Total',
-        line=dict(color='#1B3A6B', width=2.5),
-        fill='tozeroy', fillcolor='rgba(27,58,107,0.07)',
-        hovertemplate='<b>IAJA</b><br>%{x}<br>R$ %{y:,.0f}<extra></extra>',
-    ))
-    # Consolidado = IAJA + Assistencial
-    total_cons = [a + b for a, b in zip(d['hist_iaja']['Total'], d['hist_ass']['Total'])]
-    fig_cons.add_trace(go.Scatter(
-        x=d['hist_iaja']['datas'], y=total_cons,
-        mode='lines', name='Consolidado (IAJA+ASS)',
-        line=dict(color='#E67E22', width=2.5, dash='dot'),
-        hovertemplate='<b>Consolidado</b><br>%{x}<br>R$ %{y:,.0f}<extra></extra>',
-    ))
-    fig_cons.update_layout(
-        height=280, margin=dict(t=10, b=40, l=10, r=10),
-        legend=dict(orientation='h', y=-0.25, x=0.5, xanchor='center', font=dict(size=10)),
-        xaxis=dict(showgrid=False, tickfont=dict(size=9), tickangle=45),
-        yaxis=dict(showgrid=True, gridcolor='#F0F0F0', tickformat=',.0f',
-                   tickprefix='R$ ', tickfont=dict(size=9)),
-        plot_bgcolor='white', paper_bgcolor='white',
-        hovermode='x unified',
-    )
-    st.plotly_chart(fig_cons, use_container_width=True, key='fig_cons_hist')
+        st.markdown("""
+        <div style="font-size:0.85rem;font-weight:700;color:#1B3A6B;margin-bottom:4px;">
+          Recursos PPG — Total (US$)</div>""", unsafe_allow_html=True)
+        hp = d['hist_ppg']
+        fig_ppg = go.Figure()
+        fig_ppg.add_trace(go.Scatter(
+            x=hp['datas'], y=hp['Total'],
+            mode='lines', name='PPG',
+            line=dict(color='#27AE60', width=2.5),
+            fill='tozeroy', fillcolor='rgba(39,174,96,0.08)',
+            hovertemplate='<b>PPG</b><br>%{x}<br>US$ %{y:,.0f}<extra></extra>',
+        ))
+        _layout_graf(fig_ppg, tickprefix='US$ ')
+        st.plotly_chart(fig_ppg, use_container_width=True, key='fig_ppg_hist')
 
     # ── PDF ───────────────────────────────────────────────────────────────────
     st.markdown("<hr style='margin:20px 0;border-color:#E2E9F2;'>", unsafe_allow_html=True)
