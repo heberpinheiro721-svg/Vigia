@@ -1219,15 +1219,17 @@ if pagina == 'Dashboard':
 
         # Renda Variável — FIA Ações
         acoes_row = ultimo[ultimo['fundo'].isin(['FIA Ações', 'FIC FIA'])]
-        if not acoes_row.empty and ibov_mes != 0.0:
+        if not acoes_row.empty:
             ac = acoes_row.iloc[0]
-            di2m = ac['Mês_pct'] - ibov_mes
-            di2a = ac['Ano_pct'] - ibov_ano
-            html_rend += f"""
+            html_rend += """
           <tr style="background:#F5F7FA;">
             <td colspan="6" style="padding:4px 10px;font-size:0.69rem;
                 color:#8AAECB;font-weight:600;letter-spacing:0.04em;">RENDA VARIÁVEL</td>
-          </tr>
+          </tr>"""
+            if ibov_mes != 0.0:
+                di2m = ac['Mês_pct'] - ibov_mes
+                di2a = ac['Ano_pct'] - ibov_ano
+                html_rend += f"""
           <tr>
             <td>IAJA Ações (FIA)</td>
             <td style="font-weight:600;color:#1A2E46;">{ac['Mês_pct']:.2f}%</td>
@@ -1236,6 +1238,15 @@ if pagina == 'Dashboard':
             <td style="font-weight:600;color:#1A2E46;">{ac['Ano_pct']:.2f}%</td>
             <td style="background:{_bg(di2a)};color:{_fc(di2a)};font-weight:600;">
               {_seta(di2a)} {abs(di2a):.2f}% vs Ibov ({ibov_ano:.2f}%)</td>
+          </tr>"""
+            else:
+                html_rend += f"""
+          <tr>
+            <td>IAJA Ações (FIA)</td>
+            <td style="font-weight:600;color:#1A2E46;">{ac['Mês_pct']:.2f}%</td>
+            <td colspan="2" style="color:#8AAECB;font-size:0.78rem;">Ibov indisponível</td>
+            <td style="font-weight:600;color:#1A2E46;">{ac['Ano_pct']:.2f}%</td>
+            <td style="color:#8AAECB;font-size:0.78rem;">—</td>
           </tr>"""
 
         html_rend += "</table>"
