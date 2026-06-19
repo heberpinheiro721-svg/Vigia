@@ -1638,7 +1638,7 @@ elif pagina == 'Posição Financeira':
             xaxis=dict(showgrid=False, tickfont=dict(size=8), tickangle=45),
             yaxis=dict(
                 range=[y_min, y_max],
-                showgrid=True, gridcolor='#F0F0F0', tickformat=',.0f',
+                zeroline=False, showgrid=False, tickformat=',.0f',
                 tickprefix=prefixo+' ', tickfont=dict(size=8),
             ),
             plot_bgcolor='white', paper_bgcolor='white',
