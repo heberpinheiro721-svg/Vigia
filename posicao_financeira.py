@@ -110,8 +110,8 @@ def parse_posicao(filepath: Path) -> dict:
 
 
 def _chart_png(titulo: str, datas: list, valores: list, cor: str,
-               prefixo: str, w_in: float = 5.0, h_in: float = 1.8) -> bytes | None:
-    """Gera PNG do gráfico via matplotlib."""
+               prefixo: str, w_in: float = 5.0, h_in: float = 2.2) -> bytes | None:
+    """Gera PNG de alta resolução via matplotlib."""
     try:
         import matplotlib
         matplotlib.use('Agg')
@@ -128,15 +128,17 @@ def _chart_png(titulo: str, datas: list, valores: list, cor: str,
         n      = len(valores)
         x      = list(range(n))
 
-        fig, ax = plt.subplots(figsize=(w_in, h_in), dpi=150)
+        fig, ax = plt.subplots(figsize=(w_in, h_in), dpi=300)
         ax.fill_between(x, y_min, valores, alpha=0.14, color=cor)
-        ax.plot(x, valores, color=cor, linewidth=1.4)
+        ax.plot(x, valores, color=cor, linewidth=2.0)
         ax.set_xlim(0, n - 1)
         ax.set_ylim(y_min, y_max)
 
+        # Máximo 10 labels no eixo X para não sobrepor
         step = max(1, n // 10)
         ax.set_xticks(x[::step])
-        ax.set_xticklabels(datas[::step], rotation=45, ha='right', fontsize=5)
+        ax.set_xticklabels(datas[::step], rotation=45, ha='right',
+                           fontsize=8, color='#444444')
 
         def _fmt(v, _):
             if abs(v) >= 1e9: return f'{prefixo} {v/1e9:.2f}Bi'
@@ -144,19 +146,21 @@ def _chart_png(titulo: str, datas: list, valores: list, cor: str,
             return f'{prefixo} {v:,.0f}'
 
         ax.yaxis.set_major_formatter(mticker.FuncFormatter(_fmt))
-        ax.tick_params(axis='y', labelsize=5)
-        ax.set_title(titulo, fontsize=6.5, color='#1A2E46', fontweight='bold', pad=3)
+        ax.tick_params(axis='y', labelsize=8, colors='#444444')
+        ax.set_title(titulo, fontsize=10, color='#1A2E46',
+                     fontweight='bold', pad=6)
         ax.set_facecolor('#FFFFFF')
         fig.patch.set_facecolor('#FFFFFF')
         ax.grid(False)
         for sp in ['top', 'right']:
             ax.spines[sp].set_visible(False)
         for sp in ['bottom', 'left']:
-            ax.spines[sp].set_color('#CCCCCC')
-        fig.tight_layout(pad=0.4)
+            ax.spines[sp].set_color('#DDDDDD')
+            ax.spines[sp].set_linewidth(0.8)
+        fig.tight_layout(pad=0.6)
 
         buf = BytesIO()
-        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight',
+        plt.savefig(buf, format='png', dpi=300, bbox_inches='tight',
                     facecolor='white', edgecolor='none')
         plt.close(fig)
         buf.seek(0)
@@ -343,33 +347,33 @@ def gerar_pdf_posicao(dados: dict) -> bytes:
 
     # ── Gráficos históricos ───────────────────────────────────────────────────
     datas  = dados['hist_datas']
-    cw2    = 13.0 * cm   # largura de cada coluna (2 colunas)
-    ch2    = 3.2  * cm   # altura dos 2 gráficos superiores
-    ch3    = 3.4  * cm   # altura do gráfico consolidado
+    cw2    = 12.8 * cm   # largura de cada coluna (2 colunas)
+    ch2    = 4.2  * cm   # altura dos 2 gráficos superiores
+    ch3    = 4.2  * cm   # altura do gráfico consolidado
 
     png_brasil = _chart_png('Brasil (IAJA + Assistencial)', datas,
                             dados['hist_brasil'], '#1B3A6B', 'R$',
-                            w_in=5.1, h_in=1.8)
+                            w_in=5.0, h_in=2.2)
     png_ppg    = _chart_png('PPG', datas,
                             dados['hist_ppg'], '#27AE60', 'US$',
-                            w_in=5.1, h_in=1.8)
+                            w_in=5.0, h_in=2.2)
     png_cons   = _chart_png(
         f'IAJA Consolidado em R$ (cotação US$ {dados["cotacao_usd"]:.2f})',
         datas, dados['hist_consolidado'], '#2472B5', 'R$',
-        w_in=10.5, h_in=1.9)
+        w_in=10.3, h_in=2.2)
 
     def _img(png, w, h):
         return RLImage(BytesIO(png), width=w, height=h) if png else Spacer(w, h)
 
     linha_g1 = Table(
         [[_img(png_brasil, cw2, ch2), _img(png_ppg, cw2, ch2)]],
-        colWidths=[cw2 + 0.1*cm, cw2 + 0.1*cm],
+        colWidths=[cw2 + 0.2*cm, cw2 + 0.2*cm],
     )
     story.append(linha_g1)
     story.append(Spacer(1, 0.2 * cm))
 
     if png_cons:
-        story.append(RLImage(BytesIO(png_cons), width=26.1*cm, height=ch3))
+        story.append(RLImage(BytesIO(png_cons), width=26.0*cm, height=ch3))
 
     # ── Rodapé ────────────────────────────────────────────────────────────────
     story.append(Spacer(1, 0.5 * cm))
