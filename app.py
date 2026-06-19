@@ -1455,7 +1455,7 @@ elif pagina == 'Evolução Mensal':
         st.info("Arquivo de cotas não encontrado em `data/cotas/`.")
         st.stop()
 
-    @st.cache_data(ttl=3600, show_spinner=False)
+    @st.cache_data(ttl=86400, show_spinner=False)
     def _tabela_mensal_cached(_df, _dir: str, cache_key: str):
         return montar_tabela_mensal(_df, Path(_dir), ultimos_n=12)
 
