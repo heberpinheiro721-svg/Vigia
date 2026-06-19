@@ -1456,13 +1456,13 @@ elif pagina == 'Evolução Mensal':
         st.stop()
 
     @st.cache_data(ttl=3600, show_spinner=False)
-    def _tabela_mensal_cached(_df, cache_key: str):
-        return montar_tabela_mensal(_df)
+    def _tabela_mensal_cached(_df, _dir: str, cache_key: str):
+        return montar_tabela_mensal(_df, Path(_dir), ultimos_n=12)
 
     _cache_key = f"{df_cotas['Data'].min().date()}_{df_cotas['Data'].max().date()}"
 
-    with st.spinner("Buscando dados de benchmarks..."):
-        df_tab = _tabela_mensal_cached(df_cotas, _cache_key)
+    with st.spinner("Buscando benchmarks e lendo histórico de cotas (pode levar ~20s)..."):
+        df_tab = _tabela_mensal_cached(df_cotas, str(data_dir), _cache_key)
 
     if df_tab.empty:
         st.warning("Sem dados suficientes para montar a tabela.")
