@@ -231,7 +231,7 @@ def gerar_pdf_posicao(dados: dict) -> bytes:
         ('PADDING',    (0, 0), (-1, -1), 10),
     ]))
     story.append(cab)
-    story.append(Spacer(1, 0.4 * cm))
+    story.append(Spacer(1, 0.3 * cm))
 
     # ── Helpers ────────────────────────────────────────────────────────────────
     def fmt_val(v, moeda='R$'):
@@ -314,10 +314,10 @@ def gerar_pdf_posicao(dados: dict) -> bytes:
     linha2 = Table([[KeepInFrame(w, 15*cm, b_ass), KeepInFrame(w, 15*cm, b_cons)]],
                    colWidths=[w + 0.3*cm, w + 0.3*cm])
 
-    story += [linha1, Spacer(1, 0.4*cm), linha2]
+    story += [linha1, Spacer(1, 0.25*cm), linha2]
 
     # ── Cotação US$ em destaque ───────────────────────────────────────────────
-    story.append(Spacer(1, 0.35 * cm))
+    story.append(Spacer(1, 0.2 * cm))
     s_cot_label = ParagraphStyle('cotl', fontSize=7, textColor=BRANCO,
                                  fontName='Helvetica', alignment=TA_RIGHT)
     s_cot_val   = ParagraphStyle('cotv', fontSize=11, textColor=BRANCO,
@@ -343,24 +343,25 @@ def gerar_pdf_posicao(dados: dict) -> bytes:
         ('PADDING', (0,0), (-1,-1), 0),
     ]))
     story.append(cot_tab)
-    story.append(Spacer(1, 0.25 * cm))
+    story.append(Spacer(1, 0.15 * cm))
 
     # ── Gráficos históricos ───────────────────────────────────────────────────
     datas  = dados['hist_datas']
     cw2    = 12.8 * cm   # largura de cada coluna (2 colunas)
-    ch2    = 4.2  * cm   # altura dos 2 gráficos superiores
-    ch3    = 4.2  * cm   # altura do gráfico consolidado
+    ch2    = 3.3  * cm   # altura dos 2 gráficos superiores
+    ch3    = 3.3  * cm   # altura do gráfico consolidado
 
+    # Figuras geradas maiores que o destino no PDF → texto mais nítido
     png_brasil = _chart_png('Brasil (IAJA + Assistencial)', datas,
                             dados['hist_brasil'], '#1B3A6B', 'R$',
-                            w_in=5.0, h_in=2.2)
+                            w_in=8.0, h_in=2.4)
     png_ppg    = _chart_png('PPG', datas,
                             dados['hist_ppg'], '#27AE60', 'US$',
-                            w_in=5.0, h_in=2.2)
+                            w_in=8.0, h_in=2.4)
     png_cons   = _chart_png(
         f'IAJA Consolidado em R$ (cotação US$ {dados["cotacao_usd"]:.2f})',
         datas, dados['hist_consolidado'], '#2472B5', 'R$',
-        w_in=10.3, h_in=2.2)
+        w_in=16.0, h_in=2.4)
 
     def _img(png, w, h):
         return RLImage(BytesIO(png), width=w, height=h) if png else Spacer(w, h)
@@ -370,13 +371,13 @@ def gerar_pdf_posicao(dados: dict) -> bytes:
         colWidths=[cw2 + 0.2*cm, cw2 + 0.2*cm],
     )
     story.append(linha_g1)
-    story.append(Spacer(1, 0.2 * cm))
+    story.append(Spacer(1, 0.15 * cm))
 
     if png_cons:
         story.append(RLImage(BytesIO(png_cons), width=26.0*cm, height=ch3))
 
     # ── Rodapé ────────────────────────────────────────────────────────────────
-    story.append(Spacer(1, 0.5 * cm))
+    story.append(Spacer(1, 0.25 * cm))
     story.append(HRFlowable(width='100%', thickness=0.5, color=COR_AZUL))
     story.append(Spacer(1, 0.15 * cm))
     story.append(Paragraph(
