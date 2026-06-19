@@ -1621,8 +1621,10 @@ elif pagina == 'Posição Financeira':
         validos = [v for v in valores if v and v > 0]
         if not validos:
             return go.Figure()
-        y_min = min(validos) * 0.97
-        y_max = max(validos) * 1.15
+        y_min   = min(validos) * 0.97
+        y_last  = valores[-1] if valores else max(validos)
+        # Valor atual fica em ~80% da altura (1 dedo abaixo do topo)
+        y_max   = max(y_min + (y_last - y_min) / 0.80, max(validos) * 1.03)
         fig = go.Figure()
         # Polígono fechado manualmente: evita artefato de linha do fill='tozeroy'
         fig.add_trace(go.Scatter(
