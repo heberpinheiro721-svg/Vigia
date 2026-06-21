@@ -12,7 +12,8 @@ import calendar as _calendar_app
 from datetime import date, timedelta
 from pathlib import Path
 
-from parser import load_carteira_s3, load_carteira_historica, carteira_para_mes
+from parser import load_carteira_s3
+from composicao_historica import load_carteira_historica, carteira_para_mes
 from rules_engine import ComplianceEngine, SEGMENT_LIMITS
 from ai_analysis import gerar_analise_compliance, chat_vigia, chat_persona, PERSONAS
 from email_sender import enviar_relatorio_email
