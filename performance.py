@@ -61,13 +61,11 @@ def load_cotas(filepath) -> pd.DataFrame:
     df['fundo'] = df['Cliente'].apply(_curto)
     df['cliente_orig'] = df['Cliente']
 
-    # Inclui último dia do mês anterior como base (normalização)
-    ultimo_anterior = df[df['Data'] < '2026-03-01']['Data'].max()
-    df = df[df['Data'] >= ultimo_anterior].copy()
     df = df.sort_values(['fundo', 'Data']).reset_index(drop=True)
 
-    # Retorno acumulado relativo ao primeiro dia (base 100)
-    base = df[df['Data'] == ultimo_anterior].set_index('fundo')['Cota']
+    # Base dinâmica: primeira data disponível nos dados
+    base_date = df['Data'].min()
+    base = df[df['Data'] == base_date].set_index('fundo')['Cota']
     df['cota_base100'] = df.apply(
         lambda r: (r['Cota'] / base.get(r['fundo'], r['Cota'])) * 100
         if base.get(r['fundo']) else 100.0,
@@ -76,13 +74,35 @@ def load_cotas(filepath) -> pd.DataFrame:
 
     return df
 
+
+def load_cotas_all(paths: list) -> pd.DataFrame:
+    """Carrega e concatena múltiplos CSVs de cotas, recalculando base100 no período completo."""
+    dfs = []
+    for p in paths:
+        try:
+            dfs.append(load_cotas(p))
+        except Exception:
+            continue
+    if not dfs:
+        raise ValueError("Nenhum CSV de cotas válido encontrado.")
+    df = pd.concat(dfs, ignore_index=True)
+    df = df.drop_duplicates(subset=['fundo', 'Data']).sort_values(['fundo', 'Data']).reset_index(drop=True)
+    # Recalcula base100 para o período completo concatenado
+    base_date = df['Data'].min()
+    base = df[df['Data'] == base_date].set_index('fundo')['Cota']
+    df['cota_base100'] = df.apply(
+        lambda r: (r['Cota'] / base.get(r['fundo'], r['Cota'])) * 100
+        if base.get(r['fundo']) else 100.0,
+        axis=1,
+    )
+    return df
+
 def ultima_posicao(df: pd.DataFrame) -> pd.DataFrame:
     return df[df['Data'] == df['Data'].max()].copy()
 
-def achar_cotas_csv(data_dir: Path) -> Path | None:
+def achar_cotas_csv(data_dir: Path) -> list:
+    """Retorna todos os CSVs de cotas ordenados por nome (do mais antigo ao mais recente)."""
     cotas_dir = data_dir / "cotas"
     if cotas_dir.exists():
-        csvs = sorted(cotas_dir.glob("*.csv"), key=lambda x: x.stat().st_mtime, reverse=True)
-        if csvs:
-            return csvs[0]
-    return None
+        return sorted(cotas_dir.glob("*.csv"), key=lambda x: x.name)
+    return []

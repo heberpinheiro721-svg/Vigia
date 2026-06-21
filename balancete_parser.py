@@ -151,13 +151,18 @@ def parse_balancete(filepath) -> dict:
     return _parse_pdf(filepath)
 
 
+def _ano_do_nome(p: Path) -> int:
+    anos = re.findall(r'20\d{2}', p.name)
+    return max(int(a) for a in anos) if anos else 0
+
+
 def listar_balancetes(data_dir: Path) -> list:
-    """Retorna todos os arquivos de balancete (XLSX e PDF) ordenados por nome."""
+    """Retorna todos os arquivos de balancete (XLSX e PDF) ordenados pelo ano mais recente no nome."""
     bal_dir = data_dir / 'Balancete'
     if not bal_dir.exists():
         return []
     arquivos = list(bal_dir.glob('*.xlsx')) + list(bal_dir.glob('*.pdf'))
-    return sorted(arquivos, key=lambda x: x.name, reverse=True)
+    return sorted(arquivos, key=lambda x: (_ano_do_nome(x), x.stat().st_mtime), reverse=True)
 
 
 def achar_balancete(data_dir: Path):
@@ -165,7 +170,7 @@ def achar_balancete(data_dir: Path):
     bal_dir = data_dir / 'Balancete'
     if bal_dir.exists():
         for padrao in ('*.xlsx', '*.pdf'):
-            arquivos = sorted(bal_dir.glob(padrao), key=lambda x: x.name, reverse=True)
+            arquivos = sorted(bal_dir.glob(padrao), key=lambda x: (_ano_do_nome(x), x.stat().st_mtime), reverse=True)
             if arquivos:
                 return arquivos[0]
     return None

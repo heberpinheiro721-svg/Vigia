@@ -18,7 +18,7 @@ from ai_analysis import gerar_analise_compliance, chat_vigia, chat_persona, PERS
 from email_sender import enviar_relatorio_email
 from report_generator import gerar_pdf
 from historico import salvar_snapshot, carregar_historico, historico_para_dataframe
-from performance import load_cotas, ultima_posicao, achar_cotas_csv
+from performance import load_cotas, load_cotas_all, ultima_posicao, achar_cotas_csv
 from balancete_parser import parse_balancete, achar_balancete, listar_balancetes
 from evolucao_mensal import montar_tabela_mensal, tabela_para_texto
 from posicao_financeira import listar_posicoes, parse_posicao, gerar_pdf_posicao
@@ -751,12 +751,12 @@ def _cached_carteira(path_str: str, mtime: float, pl: float):
 
 
 @st.cache_data(show_spinner=False)
-def _cached_cotas(path_str: str, mtime: float):
-    cached = _disk_load("cotas", mtime)
+def _cached_cotas(paths_str: tuple, mtime_sum: float):
+    cached = _disk_load("cotas", mtime_sum)
     if cached is not None:
         return cached
-    result = load_cotas(Path(path_str))
-    _disk_save("cotas", mtime, result)
+    result = load_cotas_all([Path(p) for p in paths_str])
+    _disk_save("cotas", mtime_sum, result)
     return result
 
 
@@ -829,16 +829,17 @@ engine = ComplianceEngine(carteira, pl, extra_segmentos=extra_segmentos)
 
 # 3. Cotas
 df_cotas = None
+cotas_paths = achar_cotas_csv(data_dir)
 if uploaded_cotas:
     dest_cotas = data_dir / "cotas" / uploaded_cotas.name
     dest_cotas.parent.mkdir(parents=True, exist_ok=True)
     dest_cotas.write_bytes(uploaded_cotas.read())
-    cotas_path = dest_cotas
-else:
-    cotas_path = achar_cotas_csv(data_dir)
-if cotas_path:
+    if dest_cotas not in cotas_paths:
+        cotas_paths = sorted(cotas_paths + [dest_cotas], key=lambda x: x.name)
+if cotas_paths:
     try:
-        df_cotas = _cached_cotas(str(cotas_path), cotas_path.stat().st_mtime)
+        _mtime_sum = sum(p.stat().st_mtime for p in cotas_paths)
+        df_cotas = _cached_cotas(tuple(str(p) for p in cotas_paths), _mtime_sum)
     except Exception as e:
         st.sidebar.warning(f"Cotas: {e}")
 
