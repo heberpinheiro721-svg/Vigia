@@ -871,19 +871,32 @@ except Exception:
 _FUNDOS_PS = {'PL Alpha', 'PL Beta', 'PL Gama', 'Administrativo'}
 pl_ref = pl  # fallback: balancete ou PL_DEFAULT
 if df_cotas is not None:
+    # ── Calibração: balancete como âncora ──────────────────────────────────────
+    # O cotas (masters) subestima o PS pois exclui PGA e outros componentes.
+    # Calculamos o ratio balancete/cotas na data mais recente ≤ hoje,
+    # depois aplicamos esse ratio ao mês selecionado para manter a variação
+    # mensal real mas calibrada ao valor oficial do balancete.
+    _hoje     = pd.Timestamp.now().normalize()
+    _df_atual = df_cotas[df_cotas['Data'] <= _hoje]
+    if _df_atual.empty:
+        _df_atual = df_cotas
+    _data_cal   = _df_atual['Data'].max()
+    _ps_cal     = df_cotas[df_cotas['Data'] == _data_cal]
+    _ps_cal_val = _ps_cal[_ps_cal['fundo'].isin(_FUNDOS_PS)]['Patrimônio'].sum()
+    _ratio      = pl / _ps_cal_val if _ps_cal_val > 0 else 1.0
+
+    # ── PS e cotas para o mês de referência ────────────────────────────────────
     _ult_dia_ref = _calendar_app.monthrange(ano_ref, mes_ref)[1]
     _limite_ref  = pd.Timestamp(ano_ref, mes_ref, _ult_dia_ref)
     df_cotas_ref = df_cotas[df_cotas['Data'] <= _limite_ref]
     if df_cotas_ref.empty:
         df_cotas_ref = df_cotas
-    # PS e Total Investido dinâmicos: cotas na última data disponível do mês
     _ult_data_ref = df_cotas_ref['Data'].max()
-    _df_ult = df_cotas_ref[df_cotas_ref['Data'] == _ult_data_ref]
-    _ps_cotas = _df_ult[_df_ult['fundo'].isin(_FUNDOS_PS)]['Patrimônio'].sum()
+    _df_ult       = df_cotas_ref[df_cotas_ref['Data'] == _ult_data_ref]
+    _ps_cotas     = _df_ult[_df_ult['fundo'].isin(_FUNDOS_PS)]['Patrimônio'].sum()
+    # Aplica o ratio: PS(mês) = PS_cotas(mês) × (PS_balancete / PS_cotas_hoje)
     if _ps_cotas > 0:
-        pl_ref = _ps_cotas
-    # Total investido vem da carteira (escalada ao PL) ou do balancete, não do cotas
-    # O cotas inclui PGA e outros ativos fora do PS, distorcendo o valor
+        pl_ref = _ps_cotas * _ratio
     total_investido_ref = None
 else:
     df_cotas_ref = None
