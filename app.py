@@ -882,11 +882,9 @@ if df_cotas is not None:
     _ps_cotas = _df_ult[_df_ult['fundo'].isin(_FUNDOS_PS)]['Patrimônio'].sum()
     if _ps_cotas > 0:
         pl_ref = _ps_cotas
-    # Total investido = apenas sub-fundos (excluindo os fundos master que os contêm)
-    # Somar todos causaria dupla contagem: PL Alpha e seus ativos subjacentes
-    _sub_fundos = _df_ult[~_df_ult['fundo'].isin(_FUNDOS_PS)]
-    _total_inv_cotas = _sub_fundos['Patrimônio'].sum() if not _sub_fundos.empty else None
-    total_investido_ref = _total_inv_cotas if _total_inv_cotas and _total_inv_cotas > 0 else None
+    # Total investido vem da carteira (escalada ao PL) ou do balancete, não do cotas
+    # O cotas inclui PGA e outros ativos fora do PS, distorcendo o valor
+    total_investido_ref = None
 else:
     df_cotas_ref = None
     total_investido_ref = None
