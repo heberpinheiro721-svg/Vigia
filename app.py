@@ -858,12 +858,20 @@ except Exception:
 
 # df_cotas filtrado até o último dia do mês de referência
 # Garante que Rendimentos, Meta e Saúde reflitam exatamente o período selecionado
+_FUNDOS_PS = {'PL Alpha', 'PL Beta', 'PL Gama', 'Administrativo'}
+pl_ref = pl  # fallback: balancete ou PL_DEFAULT
 if df_cotas is not None:
     _ult_dia_ref = _calendar_app.monthrange(ano_ref, mes_ref)[1]
     _limite_ref  = pd.Timestamp(ano_ref, mes_ref, _ult_dia_ref)
     df_cotas_ref = df_cotas[df_cotas['Data'] <= _limite_ref]
     if df_cotas_ref.empty:
         df_cotas_ref = df_cotas
+    # PS dinâmico: soma dos planos na última data disponível do mês
+    _ult_data_ref = df_cotas_ref['Data'].max()
+    _df_ult = df_cotas_ref[df_cotas_ref['Data'] == _ult_data_ref]
+    _ps_cotas = _df_ult[_df_ult['fundo'].isin(_FUNDOS_PS)]['Patrimônio'].sum()
+    if _ps_cotas > 0:
+        pl_ref = _ps_cotas
 else:
     df_cotas_ref = None
 
@@ -941,9 +949,9 @@ if pagina == 'Dashboard':
 
     # ── KPIs ─────────────────────────────────────────────────────────────────
     k1, k2, k3, k4, k5 = st.columns(5)
-    k1.metric("Patrimônio Social",  f"R$ {pl/1e9:.3f} Bi")
+    k1.metric("Patrimônio Social",  f"R$ {pl_ref/1e9:.3f} Bi")
     k2.metric("Total Investido",    f"R$ {total_investido/1e9:.3f} Bi",
-              f"{total_investido/pl:.1%} do PS", delta_color="off")
+              f"{total_investido/pl_ref:.1%} do PS", delta_color="off")
     k3.metric("Conformidade",       f"{pct_conf:.0f}%",
               f"{v_cnt} de {total_segs} segmentos", delta_color="off")
     k4.metric("🔴 Alertas Críticos", r_cnt,
