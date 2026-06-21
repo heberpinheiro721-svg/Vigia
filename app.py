@@ -12,7 +12,7 @@ import calendar as _calendar_app
 from datetime import date, timedelta
 from pathlib import Path
 
-from parser import load_carteira_s3
+from parser import load_carteira_s3, load_carteira_historica, carteira_para_mes
 from rules_engine import ComplianceEngine, SEGMENT_LIMITS
 from ai_analysis import gerar_analise_compliance, chat_vigia, chat_persona, PERSONAS
 from email_sender import enviar_relatorio_email
@@ -773,6 +773,15 @@ def _cached_compliance(path_str: str, mtime: float, pl: float, emprestimos: floa
     _disk_save(key, mtime, result)
     return result
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def _cached_carteira_hist(data_dir_str: str, mtime_hash: float):
+    return load_carteira_historica(Path(data_dir_str))
+
+# Carrega histórico de composição (PDFs de Composição/)
+_comp_pdfs = list((data_dir / 'Composição').glob('*.pdf')) if (data_dir / 'Composição').exists() else []
+_mtime_pdfs = sum(p.stat().st_mtime for p in _comp_pdfs) if _comp_pdfs else 0.0
+carteira_hist = _cached_carteira_hist(str(data_dir), _mtime_pdfs) if _comp_pdfs else pd.DataFrame()
+
 # 1. Balancete — extrai o PS real
 bal_dados = None
 extra_segmentos = {}
@@ -879,6 +888,19 @@ else:
     df_cotas_ref = None
     total_investido_ref = None
 
+# Carteira e compliance do mês selecionado (usa histórico de PDFs se disponível)
+_cart_mes = carteira_para_mes(carteira_hist, pl_ref, ano_ref, mes_ref) if not carteira_hist.empty else None
+if _cart_mes is not None:
+    _dash_carteira = _cart_mes
+    _dash_eng      = ComplianceEngine(_dash_carteira, pl_ref, extra_segmentos={})
+    _dash_resumo   = _dash_eng.resumo_segmentos()
+    _dash_counts   = _dash_eng.contagem_status()
+else:
+    _dash_carteira = carteira
+    _dash_resumo   = resumo
+    _dash_counts   = counts
+    _dash_eng      = engine
+
 
 # ── Navegação mobile ──────────────────────────────────────────────────────────
 _mob_keys = list(MODULOS.keys())
@@ -917,11 +939,11 @@ pagina = st.session_state.active_page
 # ══════════════════════════════════════════════════════════════════════════════
 if pagina == 'Dashboard':
 
-    _inv_estatico = bal_dados['consolidado']['investimentos'] if bal_dados else carteira['val_ajustado'].sum()
+    _inv_estatico = bal_dados['consolidado']['investimentos'] if bal_dados else _dash_carteira['val_ajustado'].sum()
     total_investido = total_investido_ref if total_investido_ref else _inv_estatico
     b = benchmarks
-    v_cnt, a_cnt, r_cnt = counts['verde'], counts['amarelo'], counts['vermelho']
-    total_segs  = len(resumo)
+    v_cnt, a_cnt, r_cnt = _dash_counts['verde'], _dash_counts['amarelo'], _dash_counts['vermelho']
+    total_segs  = len(_dash_resumo)
     pct_conf    = v_cnt / total_segs * 100 if total_segs else 0
 
     # ── Banner de status ──────────────────────────────────────────────────────
@@ -983,7 +1005,7 @@ if pagina == 'Dashboard':
         </div>
         """, unsafe_allow_html=True)
 
-        seg_vals = [(s['segmento'], s['valor']) for s in resumo if s['valor'] > 0]
+        seg_vals = [(s['segmento'], s['valor']) for s in _dash_resumo if s['valor'] > 0]
         labels_a = [sv[0] for sv in seg_vals]
         values_a = [sv[1] for sv in seg_vals]
         cores_a  = ['#1B3A6B','#2472B5','#3498DB','#5DADE2','#85C1E9',
@@ -1006,7 +1028,7 @@ if pagina == 'Dashboard':
         st.plotly_chart(fig_pie, width='stretch', config={'displayModeBar': False})
 
         # Tabela compacta de alocação com limite CMN 4.994/2022
-        lim_dict = {s['segmento']: s for s in resumo}
+        lim_dict = {s['segmento']: s for s in _dash_resumo}
         html_aloc = """<table style="width:100%;border-collapse:collapse;font-size:0.78rem;margin-top:2px;">
           <tr style="background:#F0F3F8;">
             <th style="padding:5px 8px;text-align:left;color:#52697E;font-weight:600;">Segmento</th>
@@ -1285,7 +1307,7 @@ if pagina == 'Dashboard':
         if briefing_key not in st.session_state:
             comp_texto = '\n'.join(
                 f"  {s['segmento']}: {s['pct_pl']:.1%} / limite {s['limite_pct']:.0%} ({s['status']})"
-                for s in resumo
+                for s in _dash_resumo
             )
             bm_texto = (
                 f"  CDI: {b['cdi_mes']:.2f}% mês / {b['cdi_ano']:.2f}% ano\n"
