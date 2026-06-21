@@ -39,7 +39,7 @@ st.set_page_config(
     initial_sidebar_state="auto",
 )
 
-PL_DEFAULT   = 2_107_321_289.97
+PL_DEFAULT   = 2_183_078_242.48  # PS balancete Jan-Mai/2026 (atualizado jun/2026)
 _hoje        = date.today()
 # Último dia útil do mês anterior
 _prev_mes    = _hoje.month - 1 or 12
