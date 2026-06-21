@@ -940,8 +940,15 @@ pagina = st.session_state.active_page
 # ══════════════════════════════════════════════════════════════════════════════
 if pagina == 'Dashboard':
 
-    _inv_estatico = bal_dados['consolidado']['investimentos'] if bal_dados else _dash_carteira['val_ajustado'].sum()
-    total_investido = total_investido_ref if total_investido_ref else _inv_estatico
+    # Quando há carteira histórica para o mês, usa ela (dinâmica).
+    # Só cai para o balancete se for o mês corrente (sem snapshot histórico).
+    if _cart_mes is not None:
+        _inv_estatico = _dash_carteira['val_ajustado'].sum()
+    elif bal_dados:
+        _inv_estatico = bal_dados['consolidado']['investimentos']
+    else:
+        _inv_estatico = _dash_carteira['val_ajustado'].sum()
+    total_investido = _inv_estatico
     b = benchmarks
     v_cnt, a_cnt, r_cnt = _dash_counts['verde'], _dash_counts['amarelo'], _dash_counts['vermelho']
     total_segs  = len(_dash_resumo)
