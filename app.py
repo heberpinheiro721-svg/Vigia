@@ -866,14 +866,18 @@ if df_cotas is not None:
     df_cotas_ref = df_cotas[df_cotas['Data'] <= _limite_ref]
     if df_cotas_ref.empty:
         df_cotas_ref = df_cotas
-    # PS dinâmico: soma dos planos na última data disponível do mês
+    # PS e Total Investido dinâmicos: cotas na última data disponível do mês
     _ult_data_ref = df_cotas_ref['Data'].max()
     _df_ult = df_cotas_ref[df_cotas_ref['Data'] == _ult_data_ref]
     _ps_cotas = _df_ult[_df_ult['fundo'].isin(_FUNDOS_PS)]['Patrimônio'].sum()
     if _ps_cotas > 0:
         pl_ref = _ps_cotas
+    # Total investido = soma do patrimônio de TODOS os fundos gerenciados no mês
+    _total_inv_cotas = _df_ult['Patrimônio'].sum()
+    total_investido_ref = _total_inv_cotas if _total_inv_cotas > 0 else None
 else:
     df_cotas_ref = None
+    total_investido_ref = None
 
 
 # ── Navegação mobile ──────────────────────────────────────────────────────────
@@ -913,7 +917,8 @@ pagina = st.session_state.active_page
 # ══════════════════════════════════════════════════════════════════════════════
 if pagina == 'Dashboard':
 
-    total_investido = bal_dados['consolidado']['investimentos'] if bal_dados else carteira['val_ajustado'].sum()
+    _inv_estatico = bal_dados['consolidado']['investimentos'] if bal_dados else carteira['val_ajustado'].sum()
+    total_investido = total_investido_ref if total_investido_ref else _inv_estatico
     b = benchmarks
     v_cnt, a_cnt, r_cnt = counts['verde'], counts['amarelo'], counts['vermelho']
     total_segs  = len(resumo)
@@ -1011,7 +1016,7 @@ if pagina == 'Dashboard':
           </tr>"""
         for i, (seg, val) in enumerate(seg_vals):
             cor_seg = cores_a[i % len(cores_a)]
-            pct_seg = val / pl * 100
+            pct_seg = val / pl_ref * 100
             seg_info = lim_dict.get(seg, {})
             lim_pct = seg_info.get('limite_pct', 1.0) * 100
             status  = seg_info.get('status', 'verde')
