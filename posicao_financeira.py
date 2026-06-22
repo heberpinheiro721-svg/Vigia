@@ -95,16 +95,18 @@ def parse_posicao(filepath: Path) -> dict:
     total_cons_h = [b + p * cotacao_usd for b, p in zip(total_brasil_h, total_ppg_h)]
 
     return {
-        'data_ref':        data_ref,
-        'data_relatorio':  data_relatorio,
-        'iaja':            iaja,
-        'ppg':             ppg,
-        'assistencial':    assistencial,
-        'consolidado':     consolidado,
-        'cotacao_usd':     cotacao_usd,
-        'hist_datas':      datas,
-        'hist_brasil':     total_brasil_h,   # IAJA + Assistencial (R$)
-        'hist_ppg':        total_ppg_h,      # PPG total (US$)
+        'data_ref':         data_ref,
+        'data_relatorio':   data_relatorio,
+        'iaja':             iaja,
+        'ppg':              ppg,
+        'assistencial':     assistencial,
+        'consolidado':      consolidado,
+        'cotacao_usd':      cotacao_usd,
+        'hist_datas':       datas,
+        'hist_iaja':        total_iaja_h,    # IAJA só (R$)
+        'hist_assistencial': total_ass_h,    # Assistencial só (R$)
+        'hist_brasil':      total_brasil_h,  # IAJA + Assistencial (R$)
+        'hist_ppg':         total_ppg_h,     # PPG total (US$)
         'hist_consolidado': total_cons_h,    # Brasil + PPG×cotação (R$)
     }
 
@@ -345,36 +347,39 @@ def gerar_pdf_posicao(dados: dict) -> bytes:
     story.append(cot_tab)
     story.append(Spacer(1, 0.15 * cm))
 
-    # ── Gráficos históricos ───────────────────────────────────────────────────
+    # ── Gráficos históricos — layout 2×2 ─────────────────────────────────────
     datas  = dados['hist_datas']
-    cw2    = 12.8 * cm   # largura de cada coluna (2 colunas)
-    ch2    = 3.3  * cm   # altura dos 2 gráficos superiores
-    ch3    = 3.3  * cm   # altura do gráfico consolidado
+    cw2    = 12.8 * cm
+    ch2    = 3.0  * cm
 
-    # Figuras geradas maiores que o destino no PDF → texto mais nítido
-    png_brasil = _chart_png('Brasil (IAJA + Assistencial)', datas,
-                            dados['hist_brasil'], '#1B3A6B', 'R$',
-                            w_in=8.0, h_in=2.4)
-    png_ppg    = _chart_png('PPG', datas,
-                            dados['hist_ppg'], '#27AE60', 'US$',
-                            w_in=8.0, h_in=2.4)
-    png_cons   = _chart_png(
-        f'IAJA Consolidado em R$ (cotação US$ {dados["cotacao_usd"]:.2f})',
+    png_iaja = _chart_png('IAJA', datas,
+                          dados['hist_iaja'], '#1B3A6B', 'R$',
+                          w_in=8.0, h_in=2.4)
+    png_ppg  = _chart_png('PPG', datas,
+                          dados['hist_ppg'], '#27AE60', 'US$',
+                          w_in=8.0, h_in=2.4)
+    png_ass  = _chart_png('Assistencial', datas,
+                          dados['hist_assistencial'], '#E67E22', 'R$',
+                          w_in=8.0, h_in=2.4)
+    png_cons = _chart_png(
+        f'Consolidado (US$ {dados["cotacao_usd"]:.2f})',
         datas, dados['hist_consolidado'], '#2472B5', 'R$',
-        w_in=16.0, h_in=2.4)
+        w_in=8.0, h_in=2.4)
 
     def _img(png, w, h):
         return RLImage(BytesIO(png), width=w, height=h) if png else Spacer(w, h)
 
     linha_g1 = Table(
-        [[_img(png_brasil, cw2, ch2), _img(png_ppg, cw2, ch2)]],
+        [[_img(png_iaja, cw2, ch2), _img(png_ppg, cw2, ch2)]],
+        colWidths=[cw2 + 0.2*cm, cw2 + 0.2*cm],
+    )
+    linha_g2 = Table(
+        [[_img(png_ass, cw2, ch2), _img(png_cons, cw2, ch2)]],
         colWidths=[cw2 + 0.2*cm, cw2 + 0.2*cm],
     )
     story.append(linha_g1)
     story.append(Spacer(1, 0.15 * cm))
-
-    if png_cons:
-        story.append(RLImage(BytesIO(png_cons), width=26.0*cm, height=ch3))
+    story.append(linha_g2)
 
     # ── Rodapé ────────────────────────────────────────────────────────────────
     story.append(Spacer(1, 0.25 * cm))

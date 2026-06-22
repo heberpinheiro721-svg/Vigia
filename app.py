@@ -1720,9 +1720,9 @@ elif pagina == 'Posição Financeira':
 
     with g1:
         st.plotly_chart(
-            _graf('Brasil (IAJA + Assistencial)', datas,
-                  d['hist_brasil'], '#1B3A6B', 'rgba(27,58,107,0.12)', 'R$', 'Brasil'),
-            use_container_width=True, key='fig_brasil',
+            _graf('IAJA', datas,
+                  d['hist_iaja'], '#1B3A6B', 'rgba(27,58,107,0.12)', 'R$', 'IAJA'),
+            use_container_width=True, key='fig_iaja',
         )
 
     with g2:
@@ -1732,11 +1732,21 @@ elif pagina == 'Posição Financeira':
             use_container_width=True, key='fig_ppg',
         )
 
-    st.plotly_chart(
-        _graf(f'IAJA Consolidado em R$ (cotação US$ {d["cotacao_usd"]:.2f})', datas,
-              d['hist_consolidado'], '#2472B5', 'rgba(36,114,181,0.12)', 'R$', 'Consolidado'),
-        use_container_width=True, key='fig_consolidado',
-    )
+    g3, g4 = st.columns(2, gap="medium")
+
+    with g3:
+        st.plotly_chart(
+            _graf('Assistencial', datas,
+                  d['hist_assistencial'], '#E67E22', 'rgba(230,126,34,0.12)', 'R$', 'Assistencial'),
+            use_container_width=True, key='fig_assistencial',
+        )
+
+    with g4:
+        st.plotly_chart(
+            _graf(f'Consolidado (US$ {d["cotacao_usd"]:.2f})', datas,
+                  d['hist_consolidado'], '#2472B5', 'rgba(36,114,181,0.12)', 'R$', 'Consolidado'),
+            use_container_width=True, key='fig_consolidado',
+        )
 
     # ── PDF ───────────────────────────────────────────────────────────────────
     st.markdown("<hr style='margin:20px 0;border-color:#E2E9F2;'>", unsafe_allow_html=True)
