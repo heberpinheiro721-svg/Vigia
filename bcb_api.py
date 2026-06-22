@@ -117,42 +117,68 @@ def get_inpc_ano(ano: int) -> float:
     return (acum - 1) * 100
 
 
+def _ibov_close(ibov, ano: int, mes: int):
+    """Retorna o último fechamento disponível para o mês/ano informado."""
+    dados = ibov[(ibov.index.year == ano) & (ibov.index.month == mes)]
+    if dados.empty:
+        return None
+    return float(dados['Close'].iloc[-1].item())
+
+
 def get_ibov_mes(ano: int, mes: int) -> float:
-    """Retorna variação do Ibovespa no mês em %."""
+    """Retorna variação do Ibovespa no mês em %.
+    Cálculo correto: fechamento último pregão mês anterior → fechamento último pregão mês atual.
+    """
     try:
         import yfinance as yf
-        ultimo_dia = _calendar.monthrange(ano, mes)[1]
-        inicio = datetime(ano, mes, 1).strftime('%Y-%m-%d')
-        fim    = datetime(ano, mes, ultimo_dia).strftime('%Y-%m-%d')
-        # +5 dias para garantir que pegue o último pregão do mês
         from datetime import timedelta
-        fim_ext = (datetime(ano, mes, ultimo_dia) + timedelta(days=5)).strftime('%Y-%m-%d')
-        ibov = yf.download('^BVSP', start=inicio, end=fim_ext,
+
+        ano_ant = ano - 1 if mes == 1 else ano
+        mes_ant = 12      if mes == 1 else mes - 1
+
+        ult_dia_ant = _calendar.monthrange(ano_ant, mes_ant)[1]
+        ult_dia     = _calendar.monthrange(ano, mes)[1]
+
+        # Janela: começa alguns dias antes do fim do mês anterior
+        inicio = (datetime(ano_ant, mes_ant, ult_dia_ant) - timedelta(days=7)).strftime('%Y-%m-%d')
+        fim    = (datetime(ano, mes, ult_dia) + timedelta(days=5)).strftime('%Y-%m-%d')
+
+        ibov = yf.download('^BVSP', start=inicio, end=fim,
                            progress=False, auto_adjust=True)
-        # Filtra só o mês solicitado
-        ibov = ibov[ibov.index.month == mes]
         if ibov.empty:
             return 0.0
-        p0 = float(ibov['Close'].iloc[0].item())
-        p1 = float(ibov['Close'].iloc[-1].item())
+
+        p0 = _ibov_close(ibov, ano_ant, mes_ant)
+        p1 = _ibov_close(ibov, ano, mes)
+        if p0 is None or p1 is None or p0 == 0:
+            return 0.0
         return round((p1 / p0 - 1) * 100, 2)
     except Exception:
         return 0.0
 
 
 def get_ibov_ano(ano: int) -> float:
-    """Retorna variação acumulada do Ibovespa no ano em %."""
+    """Retorna variação acumulada do Ibovespa no ano em %.
+    Cálculo correto: fechamento dez/ano-1 → fechamento último pregão disponível do ano.
+    """
     try:
         import yfinance as yf
-        inicio = datetime(ano, 1, 1).strftime('%Y-%m-%d')
-        fim    = datetime.now().strftime('%Y-%m-%d')
+        from datetime import timedelta
+
+        # Busca dez do ano anterior + ano inteiro
+        inicio = datetime(ano - 1, 12, 24).strftime('%Y-%m-%d')
+        fim    = (datetime(ano, 12, 31) + timedelta(days=5)).strftime('%Y-%m-%d')
+
         ibov = yf.download('^BVSP', start=inicio, end=fim,
                            progress=False, auto_adjust=True)
-        ibov = ibov[ibov.index.year == ano]
         if ibov.empty:
             return 0.0
-        p0 = float(ibov['Close'].iloc[0].item())
-        p1 = float(ibov['Close'].iloc[-1].item())
+
+        p0 = _ibov_close(ibov, ano - 1, 12)
+        curr = ibov[ibov.index.year == ano]
+        if p0 is None or curr.empty or p0 == 0:
+            return 0.0
+        p1 = float(curr['Close'].iloc[-1].item())
         return round((p1 / p0 - 1) * 100, 2)
     except Exception:
         return 0.0
