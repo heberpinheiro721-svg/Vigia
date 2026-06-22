@@ -1683,18 +1683,16 @@ elif pagina == 'Posição Financeira':
         y_min = min(validos) * 0.97
         y_max = max(validos) * 1.03
         fig = go.Figure()
-        fig.add_trace(go.Scatter(
+        fig.add_trace(go.Bar(
             x=datas, y=vals,
-            mode='lines',
-            line=dict(color=cor, width=2.5),
-            showlegend=False,
-            connectgaps=False,
+            marker_color=cor,
             hovertemplate=f'<b>{hover_label}</b><br>%{{x}}<br>{prefixo} %{{y:,.0f}}<extra></extra>',
         ))
         fig.update_layout(
             title=dict(text=titulo, font=dict(size=11, color='#1A2E46'), x=0),
             height=280, margin=dict(t=30, b=50, l=10, r=10),
             showlegend=False,
+            bargap=0.15,
             xaxis=dict(showgrid=False, tickfont=dict(size=8), tickangle=45),
             yaxis=dict(
                 range=[y_min, y_max],
