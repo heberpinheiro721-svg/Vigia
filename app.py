@@ -2906,7 +2906,14 @@ elif pagina == 'Histórico':
         _PLANOS_HIST = ['PL Alpha', 'PL Beta', 'PL Gama']
         _CORES_HIST  = {'PL Alpha': '#1B3A6B', 'PL Beta': '#27AE60', 'PL Gama': '#E67E22'}
 
-        df_h = df_cotas[df_cotas['fundo'].isin(_PLANOS_HIST)].copy()
+        # Limite: apenas até o último mês fechado (mês anterior ao atual)
+        _hoje_h      = pd.Timestamp.now()
+        _ult_mes_fec = (_hoje_h.replace(day=1) - pd.Timedelta(days=1)).replace(hour=23, minute=59)
+
+        df_h = df_cotas[
+            (df_cotas['fundo'].isin(_PLANOS_HIST)) &
+            (df_cotas['Data'] <= _ult_mes_fec)
+        ].copy()
         df_h = df_h.sort_values(['fundo', 'Data'])
 
         # Agrega por mês (último registro disponível de cada mês)
