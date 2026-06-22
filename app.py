@@ -1676,28 +1676,30 @@ elif pagina == 'Posição Financeira':
     import plotly.graph_objects as go
 
     def _graf(titulo, datas, valores, cor, fill_cor, prefixo, hover_label):
-        validos = [v for v in valores if v and v > 0]
+        # Zeros/None viram None → gap limpo em vez de linha de corte até y=0
+        vals = [v if (v and v > 0) else None for v in valores]
+        validos = [v for v in vals if v is not None]
         if not validos:
             return go.Figure()
-        y_min   = min(validos) * 0.97
-        y_last  = valores[-1] if valores else max(validos)
-        # Valor atual fica em ~80% da altura (1 dedo abaixo do topo)
-        y_max   = max(y_min + (y_last - y_min) / 0.80, max(validos) * 1.03)
+        y_min  = min(validos) * 0.97
+        y_last = validos[-1]
+        y_max  = max(y_min + (y_last - y_min) / 0.80, max(validos) * 1.03)
         fig = go.Figure()
-        # Polígono fechado manualmente: evita artefato de linha do fill='tozeroy'
+        # Baseline invisível na parte inferior — fill='tonexty' preenche até ela
         fig.add_trace(go.Scatter(
-            x=list(datas) + list(reversed(datas)),
-            y=list(valores) + [y_min] * len(datas),
-            fill='toself', fillcolor=fill_cor,
+            x=datas, y=[y_min] * len(datas),
+            mode='lines',
             line=dict(width=0, color='rgba(0,0,0,0)'),
             showlegend=False, hoverinfo='skip',
         ))
-        # Linha dos dados por cima
+        # Linha dos dados com fill até a baseline
         fig.add_trace(go.Scatter(
-            x=datas, y=valores,
+            x=datas, y=vals,
+            fill='tonexty', fillcolor=fill_cor,
             mode='lines',
             line=dict(color=cor, width=2.5),
             showlegend=False,
+            connectgaps=False,
             hovertemplate=f'<b>{hover_label}</b><br>%{{x}}<br>{prefixo} %{{y:,.0f}}<extra></extra>',
         ))
         fig.update_layout(
