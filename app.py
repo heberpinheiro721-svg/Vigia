@@ -1676,26 +1676,15 @@ elif pagina == 'Posição Financeira':
     import plotly.graph_objects as go
 
     def _graf(titulo, datas, valores, cor, fill_cor, prefixo, hover_label):
-        # Zeros/None viram None → gap limpo em vez de linha de corte até y=0
         vals = [v if (v and v > 0) else None for v in valores]
         validos = [v for v in vals if v is not None]
         if not validos:
             return go.Figure()
-        y_min  = min(validos) * 0.97
-        y_last = validos[-1]
-        y_max  = max(y_min + (y_last - y_min) / 0.80, max(validos) * 1.03)
+        y_min = min(validos) * 0.97
+        y_max = max(validos) * 1.03
         fig = go.Figure()
-        # Baseline invisível na parte inferior — fill='tonexty' preenche até ela
-        fig.add_trace(go.Scatter(
-            x=datas, y=[y_min] * len(datas),
-            mode='lines',
-            line=dict(width=0, color='rgba(0,0,0,0)'),
-            showlegend=False, hoverinfo='skip',
-        ))
-        # Linha dos dados com fill até a baseline
         fig.add_trace(go.Scatter(
             x=datas, y=vals,
-            fill='tonexty', fillcolor=fill_cor,
             mode='lines',
             line=dict(color=cor, width=2.5),
             showlegend=False,
@@ -1704,15 +1693,17 @@ elif pagina == 'Posição Financeira':
         ))
         fig.update_layout(
             title=dict(text=titulo, font=dict(size=11, color='#1A2E46'), x=0),
-            height=300, margin=dict(t=30, b=50, l=10, r=10),
+            height=280, margin=dict(t=30, b=50, l=10, r=10),
             showlegend=False,
             xaxis=dict(showgrid=False, tickfont=dict(size=8), tickangle=45),
             yaxis=dict(
                 range=[y_min, y_max],
-                zeroline=False, showgrid=False, tickformat=',.0f',
+                zeroline=False, showgrid=True,
+                gridcolor='rgba(200,210,220,0.4)',
+                tickformat=',.0f',
                 tickprefix=prefixo+' ', tickfont=dict(size=8),
             ),
-            plot_bgcolor='white', paper_bgcolor='white',
+            plot_bgcolor='#FAFBFD', paper_bgcolor='white',
             hovermode='x unified',
         )
         return fig
@@ -1722,15 +1713,13 @@ elif pagina == 'Posição Financeira':
 
     with g1:
         st.plotly_chart(
-            _graf('IAJA', datas,
-                  d['hist_iaja'], '#1B3A6B', 'rgba(27,58,107,0.12)', 'R$', 'IAJA'),
+            _graf('IAJA', datas, d['hist_iaja'], '#1B3A6B', None, 'R$', 'IAJA'),
             use_container_width=True, key='fig_iaja',
         )
 
     with g2:
         st.plotly_chart(
-            _graf('PPG', datas,
-                  d['hist_ppg'], '#27AE60', 'rgba(39,174,96,0.12)', 'US$', 'PPG'),
+            _graf('PPG', datas, d['hist_ppg'], '#27AE60', None, 'US$', 'PPG'),
             use_container_width=True, key='fig_ppg',
         )
 
@@ -1738,15 +1727,14 @@ elif pagina == 'Posição Financeira':
 
     with g3:
         st.plotly_chart(
-            _graf('Assistencial', datas,
-                  d['hist_assistencial'], '#E67E22', 'rgba(230,126,34,0.12)', 'R$', 'Assistencial'),
+            _graf('Assistencial', datas, d['hist_assistencial'], '#E67E22', None, 'R$', 'Assistencial'),
             use_container_width=True, key='fig_assistencial',
         )
 
     with g4:
         st.plotly_chart(
             _graf(f'Consolidado (US$ {d["cotacao_usd"]:.2f})', datas,
-                  d['hist_consolidado'], '#2472B5', 'rgba(36,114,181,0.12)', 'R$', 'Consolidado'),
+                  d['hist_consolidado'], '#2472B5', None, 'R$', 'Consolidado'),
             use_container_width=True, key='fig_consolidado',
         )
 
