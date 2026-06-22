@@ -1561,7 +1561,7 @@ elif pagina == 'Posição Financeira':
         return parse_posicao(Path(path_str))
 
     with st.spinner("Lendo relatório..."):
-        d = _cached_posicao(str(arquivo_sel), arquivo_sel.stat().st_mtime, cache_v=2)
+        d = _cached_posicao(str(arquivo_sel), arquivo_sel.stat().st_mtime, cache_v=3)
 
     data_rel_str = d['data_relatorio'].strftime('%d/%m/%Y') if d['data_relatorio'] else ''
 
