@@ -1680,20 +1680,31 @@ elif pagina == 'Posição Financeira':
         validos = [v for v in vals if v is not None]
         if not validos:
             return go.Figure()
-        y_min = min(validos) * 0.97
-        y_max = max(validos) * 1.03
+        y_min  = min(validos) * 0.97
+        y_max  = max(validos) * 1.03
+        n_pts  = len(vals)
+        x_idx  = list(range(n_pts))
+        # Usa índice numérico como x: garante posição única mesmo quando
+        # o mesmo rótulo de data aparece duas vezes (ex: '04/Maio' em 2025 e 2026)
+        step   = max(1, n_pts // 10)
         fig = go.Figure()
         fig.add_trace(go.Bar(
-            x=datas, y=vals,
+            x=x_idx, y=vals,
             marker_color=cor,
-            hovertemplate=f'<b>{hover_label}</b><br>%{{x}}<br>{prefixo} %{{y:,.0f}}<extra></extra>',
+            customdata=datas,
+            hovertemplate=f'<b>{hover_label}</b><br>%{{customdata}}<br>{prefixo} %{{y:,.0f}}<extra></extra>',
         ))
         fig.update_layout(
             title=dict(text=titulo, font=dict(size=11, color='#1A2E46'), x=0),
             height=280, margin=dict(t=30, b=50, l=10, r=10),
             showlegend=False,
             bargap=0.15,
-            xaxis=dict(showgrid=False, tickfont=dict(size=8), tickangle=45),
+            xaxis=dict(
+                tickmode='array',
+                tickvals=x_idx[::step],
+                ticktext=datas[::step],
+                showgrid=False, tickfont=dict(size=8), tickangle=45,
+            ),
             yaxis=dict(
                 range=[y_min, y_max],
                 zeroline=False, showgrid=True,
