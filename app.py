@@ -855,7 +855,7 @@ if cotas_paths:
 
 # 4. Benchmarks BCB
 @st.cache_data(ttl=3600, show_spinner=False)
-def _buscar_benchmarks(ano: int, mes: int) -> dict:
+def _buscar_benchmarks(ano: int, mes: int, cache_v: int = 2) -> dict:
     return get_benchmarks(ano, mes)
 
 try:
