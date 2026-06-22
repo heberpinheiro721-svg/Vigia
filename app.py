@@ -2898,42 +2898,125 @@ elif pagina == 'Notícias':
 # MÓDULO: HISTÓRICO
 # ══════════════════════════════════════════════════════════════════════════════
 elif pagina == 'Histórico':
-    st.markdown('<div class="secao-titulo">📈 Histórico de Compliance — Evolução Mensal</div>', unsafe_allow_html=True)
+    st.markdown('<div class="secao-titulo">📈 Histórico de Rendimento — Evolução por Plano</div>', unsafe_allow_html=True)
 
-    col_sv, col_info = st.columns([1, 3])
-    with col_sv:
-        if st.button("💾 Salvar snapshot atual", type="primary", width='stretch'):
-            caminho = salvar_snapshot(resumo, pl, data_ref)
-            st.success(f"Salvo: {caminho.name}")
-    with col_info:
-        st.info("Salve um snapshot após cada fechamento mensal para acompanhar a evolução do compliance.")
-
-    snapshots = carregar_historico()
-    if not snapshots:
-        st.warning("Nenhum snapshot salvo ainda.")
+    if df_cotas is None:
+        st.warning("Dados de cotas não disponíveis.")
     else:
-        df_hist = historico_para_dataframe(snapshots)
-        st.markdown(f"**{len(snapshots)} períodos registrados**")
+        _PLANOS_HIST = ['PL Alpha', 'PL Beta', 'PL Gama']
+        _CORES_HIST  = {'PL Alpha': '#1B3A6B', 'PL Beta': '#27AE60', 'PL Gama': '#E67E22'}
 
-        fig_line = px.line(df_hist, x="Data", y="% do PS", color="Segmento",
-                           markers=True,
-                           color_discrete_sequence=px.colors.qualitative.Set2)
-        for seg in df_hist["Segmento"].unique():
-            lim = df_hist[df_hist["Segmento"] == seg]["Limite (%)"].iloc[0]
-            fig_line.add_hline(y=lim, line_dash="dot", line_color="red",
-                               opacity=0.3, annotation_text=f"Lim.{seg[:8]}")
-        fig_line.update_layout(yaxis_title="% do PS", xaxis_title="",
-                               legend=dict(orientation='h', y=1.05),
-                               margin=dict(t=30, b=10))
-        st.plotly_chart(fig_line, width='stretch')
+        df_h = df_cotas[df_cotas['fundo'].isin(_PLANOS_HIST)].copy()
+        df_h = df_h.sort_values(['fundo', 'Data'])
 
-        st.divider()
-        pivot = df_hist.pivot_table(index="Segmento", columns="Data",
-                                    values="Status", aggfunc="first")
-        pivot_display = pivot.map(
-            lambda v: {'vermelho': '🔴', 'amarelo': '🟡', 'verde': '🟢'}.get(v, v)
+        # Agrega por mês (último registro disponível de cada mês)
+        df_h['_mes_ano'] = df_h['Data'].dt.to_period('M')
+        df_mes = (
+            df_h.groupby(['_mes_ano', 'fundo'], as_index=False)
+            .last()
         )
-        st.dataframe(pivot_display, width='stretch')
+        df_mes['Mês'] = df_mes['Data'].dt.strftime('%b/%Y')
+        _ordem_meses = (
+            df_mes[['_mes_ano', 'Mês']]
+            .drop_duplicates()
+            .sort_values('_mes_ano')['Mês']
+            .tolist()
+        )
+
+        # ── 1. Evolução da cota (base 100) ───────────────────────────────────
+        st.markdown("#### Evolução da Cota (base 100 = início da série)")
+        fig_b100 = go.Figure()
+        for plano in _PLANOS_HIST:
+            d = df_h[df_h['fundo'] == plano]
+            if d.empty:
+                continue
+            fig_b100.add_trace(go.Scatter(
+                x=d['Data'], y=d['cota_base100'],
+                name=plano, mode='lines',
+                line=dict(color=_CORES_HIST[plano], width=2.5),
+            ))
+        fig_b100.update_layout(
+            yaxis_title="Cota (base 100)", xaxis_title="",
+            legend=dict(orientation='h', y=1.1),
+            margin=dict(t=10, b=10), height=300,
+            plot_bgcolor='#F8FAFC', paper_bgcolor='#F8FAFC',
+        )
+        st.plotly_chart(fig_b100, width='stretch', config={'displayModeBar': False})
+
+        # ── 2. Rendimento mensal por plano (barras agrupadas) ────────────────
+        st.markdown("#### Rendimento Mensal por Plano (%)")
+        fig_bar = go.Figure()
+        for plano in _PLANOS_HIST:
+            d = df_mes[df_mes['fundo'] == plano].set_index('Mês')
+            vals = [d.loc[m, 'Mês_pct'] if m in d.index else None for m in _ordem_meses]
+            fig_bar.add_trace(go.Bar(
+                x=_ordem_meses, y=vals,
+                name=plano, marker_color=_CORES_HIST[plano],
+            ))
+        fig_bar.update_layout(
+            barmode='group', yaxis_title="% mês", xaxis_title="",
+            legend=dict(orientation='h', y=1.1),
+            margin=dict(t=10, b=10), height=280,
+            plot_bgcolor='#F8FAFC', paper_bgcolor='#F8FAFC',
+        )
+        st.plotly_chart(fig_bar, width='stretch', config={'displayModeBar': False})
+
+        # ── 3. Tabela de rendimentos mensais ─────────────────────────────────
+        st.markdown("#### Tabela de Rendimentos Mensais (%)")
+        _pivot = (
+            df_mes.pivot_table(index='Mês', columns='fundo',
+                               values='Mês_pct', aggfunc='last')
+            .reindex(_PLANOS_HIST, axis=1)
+        )
+        # Ordena linhas por data (mais recente no topo)
+        _pivot = _pivot.reindex(reversed(_ordem_meses))
+
+        # Linha de acumulado no ano
+        df_mes['_ano'] = df_mes['Data'].dt.year
+        _acum = {}
+        for plano in _PLANOS_HIST:
+            _d = df_mes[(df_mes['fundo'] == plano) & (df_mes['_ano'] == ano_ref)]
+            if not _d.empty:
+                _acum[plano] = ((1 + _d['Mês_pct'] / 100).prod() - 1) * 100
+        _linha_acum = pd.DataFrame([_acum], index=[f'Acum. {ano_ref}'])
+        _pivot_final = pd.concat([_linha_acum, _pivot])
+
+        def _fmt_pct(v):
+            if pd.isna(v):
+                return '-'
+            return f"{v:+.2f}%"
+
+        def _cor(v):
+            if pd.isna(v) or not isinstance(v, float):
+                return ''
+            return 'color: #27AE60; font-weight:600' if v > 0 else 'color: #E74C3C; font-weight:600'
+
+        st.dataframe(
+            _pivot_final.style.format(_fmt_pct).map(_cor),
+            width='stretch',
+        )
+
+        # ── 4. Patrimônio por plano ───────────────────────────────────────────
+        st.markdown("#### Patrimônio por Plano (R$ MM)")
+        fig_pat = go.Figure()
+        for plano in _PLANOS_HIST:
+            d = df_h[df_h['fundo'] == plano]
+            if d.empty:
+                continue
+            fig_pat.add_trace(go.Scatter(
+                x=d['Data'], y=d['Patrimônio'] / 1e6,
+                name=plano, mode='lines',
+                line=dict(color=_CORES_HIST[plano], width=2),
+                fill='tozeroy',
+                fillcolor=_CORES_HIST[plano] + '20',
+            ))
+        fig_pat.update_layout(
+            yaxis_title="R$ MM", xaxis_title="",
+            legend=dict(orientation='h', y=1.1),
+            margin=dict(t=10, b=10), height=280,
+            plot_bgcolor='#F8FAFC', paper_bgcolor='#F8FAFC',
+        )
+        st.plotly_chart(fig_pat, width='stretch', config={'displayModeBar': False})
 
 
 if __name__ == '__main__':
