@@ -2905,6 +2905,7 @@ elif pagina == 'Histórico':
     else:
         _PLANOS_HIST = ['PL Alpha', 'PL Beta', 'PL Gama']
         _CORES_HIST  = {'PL Alpha': '#1B3A6B', 'PL Beta': '#27AE60', 'PL Gama': '#E67E22'}
+        _CORES_FILL  = {'PL Alpha': 'rgba(27,58,107,0.10)', 'PL Beta': 'rgba(39,174,96,0.10)', 'PL Gama': 'rgba(230,126,34,0.10)'}
 
         # Limite: apenas até o último mês fechado (mês anterior ao atual)
         _hoje_h      = pd.Timestamp.now()
@@ -3015,7 +3016,7 @@ elif pagina == 'Histórico':
                 name=plano, mode='lines',
                 line=dict(color=_CORES_HIST[plano], width=2),
                 fill='tozeroy',
-                fillcolor=_CORES_HIST[plano] + '20',
+                fillcolor=_CORES_FILL[plano],
             ))
         fig_pat.update_layout(
             yaxis_title="R$ MM", xaxis_title="",
