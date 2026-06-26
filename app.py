@@ -34,9 +34,9 @@ from noticias import buscar_noticias_efpc, buscar_noticias_mercado
 
 # ── Logo em base64 ────────────────────────────────────────────────────────────
 import base64 as _b64
-_LOGO_PATH = Path(__file__).parent / "data" / "Logo" / "logo.jpg"
+_LOGO_PATH = Path(__file__).parent / "data" / "Logo" / "logo.png"
 _LOGO_B64 = _b64.b64encode(_LOGO_PATH.read_bytes()).decode() if _LOGO_PATH.exists() else ""
-_LOGO_IMG = f'<img src="data:image/jpeg;base64,{_LOGO_B64}" style="width:100%;height:100%;object-fit:contain;border-radius:8px;">' if _LOGO_B64 else "🎯"
+_LOGO_IMG = f'<img src="data:image/png;base64,{_LOGO_B64}" style="width:100%;height:100%;object-fit:contain;">' if _LOGO_B64 else "🎯"
 
 # ── Configuração da página ────────────────────────────────────────────────────
 from PIL import Image as _PILImage
@@ -542,10 +542,7 @@ if not st.session_state.get("authentication_status"):
         st.markdown("""
         <div style="text-align:center;margin-bottom:28px;">
           <div style="display:inline-flex;align-items:center;justify-content:center;
-                      width:72px;height:72px;
-                      background:linear-gradient(135deg,rgba(27,58,107,0.6),rgba(36,114,181,0.3));
-                      border-radius:20px;border:1px solid rgba(255,255,255,0.12);
-                      margin-bottom:16px;overflow:hidden;padding:6px;">""" + _LOGO_IMG + """</div>
+                      width:80px;height:80px;margin-bottom:16px;">""" + _LOGO_IMG + """</div>
           <div style="font-size:2.1rem;font-weight:900;color:#FFFFFF;
                       letter-spacing:-0.03em;line-height:1;">VIGIA</div>
           <div style="font-size:0.72rem;color:#6A9AC0;letter-spacing:0.04em;
