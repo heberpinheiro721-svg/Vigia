@@ -32,10 +32,18 @@ from risco_avancado import (calcular_var, calcular_drawdown,
 from projecao import monte_carlo_patrimonio, projetar_cenarios, resumo_monte_carlo
 from noticias import buscar_noticias_efpc, buscar_noticias_mercado
 
+# ── Logo em base64 ────────────────────────────────────────────────────────────
+import base64 as _b64
+_LOGO_PATH = Path(__file__).parent / "data" / "Logo" / "logo.jpg"
+_LOGO_B64 = _b64.b64encode(_LOGO_PATH.read_bytes()).decode() if _LOGO_PATH.exists() else ""
+_LOGO_IMG = f'<img src="data:image/jpeg;base64,{_LOGO_B64}" style="width:100%;height:100%;object-fit:contain;border-radius:8px;">' if _LOGO_B64 else "🎯"
+
 # ── Configuração da página ────────────────────────────────────────────────────
+from PIL import Image as _PILImage
+_page_icon = _PILImage.open(_LOGO_PATH) if _LOGO_PATH.exists() else "🎯"
 st.set_page_config(
     page_title="VIGIA — Análise de Investimentos",
-    page_icon="🔍",
+    page_icon=_page_icon,
     layout="wide",
     initial_sidebar_state="auto",
 )
@@ -537,7 +545,7 @@ if not st.session_state.get("authentication_status"):
                       width:72px;height:72px;
                       background:linear-gradient(135deg,rgba(27,58,107,0.6),rgba(36,114,181,0.3));
                       border-radius:20px;border:1px solid rgba(255,255,255,0.12);
-                      font-size:2rem;margin-bottom:16px;">🔍</div>
+                      margin-bottom:16px;overflow:hidden;padding:6px;">""" + _LOGO_IMG + """</div>
           <div style="font-size:2.1rem;font-weight:900;color:#FFFFFF;
                       letter-spacing:-0.03em;line-height:1;">VIGIA</div>
           <div style="font-size:0.72rem;color:#6A9AC0;letter-spacing:0.04em;
@@ -606,8 +614,8 @@ st.markdown("""
   <div style="display:flex;align-items:center;gap:16px;">
     <div style="width:48px;height:48px;background:rgba(255,255,255,0.10);
                 border-radius:12px;display:flex;align-items:center;
-                justify-content:center;font-size:1.5rem;flex-shrink:0;
-                border:1px solid rgba(255,255,255,0.18);">🔍</div>
+                justify-content:center;flex-shrink:0;overflow:hidden;padding:5px;
+                border:1px solid rgba(255,255,255,0.18);">""" + _LOGO_IMG + """</div>
     <div>
       <div class="vigia-header-title"
            style="font-size:1.55rem;font-weight:800;letter-spacing:-0.03em;
@@ -639,7 +647,7 @@ with st.sidebar:
     with _sb_c1:
         st.markdown("""
         <div style="padding:4px 0 12px 0;">
-          <div style="font-size:1.35rem;font-weight:800;color:#FFFFFF;letter-spacing:-0.02em;">🔍 VIGIA</div>
+          <div style="font-size:1.35rem;font-weight:800;color:#FFFFFF;letter-spacing:-0.02em;display:flex;align-items:center;gap:8px;"><span style="display:inline-flex;width:24px;height:24px;overflow:hidden;border-radius:4px;flex-shrink:0;">""" + _LOGO_IMG + """</span> VIGIA</div>
           <div style="font-size:0.68rem;color:#5A88B5;margin-top:2px;letter-spacing:0.04em;">ANÁLISE DE INVESTIMENTOS</div>
         </div>
         """, unsafe_allow_html=True)
