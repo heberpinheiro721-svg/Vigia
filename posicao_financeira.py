@@ -9,7 +9,14 @@ def listar_posicoes(data_dir: Path) -> list:
     pos_dir = data_dir / 'Posição Financeira'
     if not pos_dir.exists():
         return []
-    return sorted(pos_dir.glob('*.xlsx'), key=lambda x: x.name, reverse=True)
+
+    def _data(p: Path):
+        try:
+            return datetime.strptime(p.stem.split()[-1], "%d-%m-%Y")
+        except Exception:
+            return datetime.min
+
+    return sorted(pos_dir.glob('*.xlsx'), key=_data, reverse=True)
 
 
 def _num(v) -> float:
