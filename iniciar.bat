@@ -4,22 +4,48 @@ setlocal
 set VENV=%USERPROFILE%\vigia_venv
 set PROJ=%~dp0
 
-echo Verificando ambiente...
+echo.
+echo  =============================================
+echo   VIGIA -- Analise de Investimentos IAJA
+echo  =============================================
+echo.
 
-if not exist "%VENV%\Scripts\streamlit.exe" (
-    echo ERRO: streamlit nao encontrado em %VENV%
+:: Verifica se Python esta instalado
+python --version >nul 2>&1
+if errorlevel 1 (
+    echo ERRO: Python nao encontrado.
+    echo Instale Python 3.12+ em https://python.org e tente novamente.
     pause & exit /b 1
 )
 
+:: Cria o venv se nao existir
+if not exist "%VENV%\Scripts\python.exe" (
+    echo Criando ambiente virtual em %VENV%...
+    python -m venv "%VENV%"
+    if errorlevel 1 (
+        echo ERRO: nao foi possivel criar o ambiente virtual.
+        pause & exit /b 1
+    )
+    echo Ambiente criado.
+    echo.
+)
+
+:: Instala/atualiza dependencias
+echo Verificando dependencias ^(aguarde na primeira vez^)...
+"%VENV%\Scripts\pip.exe" install -q -r "%PROJ%requirements.txt"
+if errorlevel 1 (
+    echo AVISO: erro ao instalar dependencias. O app pode nao funcionar corretamente.
+    echo.
+)
+
 cd /d "%PROJ%"
-echo Iniciando VIGIA... Aguarde.
+echo.
+echo Iniciando VIGIA em http://localhost:8501
+echo Pressione Ctrl+C para encerrar.
 echo.
 
-"%VENV%\Scripts\streamlit.exe" run app.py --server.headless false 2> st_err.txt
+"%VENV%\Scripts\streamlit.exe" run app.py
 
 echo.
-echo VIGIA encerrou. Verificando erros...
-echo.
-type st_err.txt
-echo.
+echo VIGIA encerrado.
 pause
