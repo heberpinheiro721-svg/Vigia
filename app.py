@@ -778,11 +778,15 @@ else:
 
 # 2. Carteira via API Caceis
 with st.spinner("Carregando carteira via Caceis..."):
-    carteira = load_carteira_api(pl=pl)
+    carteira, _data_carteira = load_carteira_api(pl=pl)
 if carteira.empty:
-    st.warning("Não foi possível carregar a composição da carteira via API Caceis. Verifique a conexão.")
+    st.error("API Caceis: não foi possível carregar a composição da carteira nos últimos 5 dias úteis.")
+    if st.button("🔄 Tentar novamente"):
+        st.cache_data.clear()
+        st.rerun()
     st.stop()
-st.sidebar.success(f"✅ Carteira Caceis ({len(carteira)} posições)")
+_dt_label = f" · {_data_carteira[8:10]}/{_data_carteira[5:7]}/{_data_carteira[:4]}" if _data_carteira else ""
+st.sidebar.success(f"✅ Carteira Caceis{_dt_label} ({len(carteira)} posições)")
 
 emprestimos_val = bal_dados['consolidado']['emprestimos_participantes'] if bal_dados else 0.0
 engine = ComplianceEngine(carteira, pl, extra_segmentos=extra_segmentos)

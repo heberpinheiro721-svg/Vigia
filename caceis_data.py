@@ -198,12 +198,22 @@ def _parse_fi(xml_text: str) -> list[dict]:
     return rows
 
 
-def _fetch_fi(cust: str, data: str) -> list[dict]:
+def _fetch_fi(cust: str, data: str) -> tuple[list[dict], str | None]:
+    """Retorna (registros, erro_str). erro_str é None se ok."""
     try:
         xml = _soap_request(cust, data, data)
-        return _parse_fi(xml)
-    except Exception:
-        return []
+        if not xml:
+            return [], f"{cust}: resposta vazia"
+        return _parse_fi(xml), None
+    except Exception as exc:
+        return [], f"{cust}: {exc}"
+
+
+def _dia_util_anterior(d: date) -> date:
+    d -= timedelta(days=1)
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
+    return d
 
 
 def _ultima_data_util() -> str:
@@ -214,22 +224,32 @@ def _ultima_data_util() -> str:
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def load_carteira_api(data: str | None = None, pl: float | None = None) -> pd.DataFrame:
+def load_carteira_api(data: str | None = None, pl: float | None = None) -> tuple[pd.DataFrame, str]:
     """
     Substitui load_carteira_s3(filepath, patrimonio_liquido).
-    Consolida posições FI de todos os planos por segmento CMN 4.661.
+    Retorna (DataFrame, data_usada). Tenta hoje → até 5 dias úteis anteriores.
+    DataFrame vazio + data_usada="" indica falha total.
     """
-    if not data:
-        data = _ultima_data_util()
+    d = date.fromisoformat(data) if data else date.today()
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
 
-    todas: list[dict] = []
-    with ThreadPoolExecutor(max_workers=4) as ex:
-        futures = [ex.submit(_fetch_fi, cust, data) for cust in FUNDOS.values()]
-        for fut in as_completed(futures):
-            todas.extend(fut.result())
+    for _ in range(5):
+        data_str = d.strftime("%Y-%m-%d")
+        todas: list[dict] = []
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            futures = {ex.submit(_fetch_fi, cust, data_str): cust for cust in FUNDOS.values()}
+            for fut in as_completed(futures):
+                registros, _ = fut.result()
+                todas.extend(registros)
+        if todas:
+            break
+        d = _dia_util_anterior(d)
+    else:
+        return pd.DataFrame(), ""
 
     if not todas:
-        return pd.DataFrame()
+        return pd.DataFrame(), ""
 
     # Consolida: soma o mesmo fundo em todos os planos
     por_fundo: dict = {}
@@ -256,4 +276,4 @@ def load_carteira_api(data: str | None = None, pl: float | None = None) -> pd.Da
     return df[[
         "cliente", "descricao", "cnpj",
         "val_liquido", "val_ajustado", "pct_pl_calc", "segmento", "_total_raw",
-    ]]
+    ]], data_str
