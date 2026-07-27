@@ -692,10 +692,9 @@ with st.sidebar:
     uploaded_bal = st.file_uploader("Upload PDF Balancete", type=['pdf'])
     data_ref = st.text_input("Data de referência", value=DATA_DEFAULT)
     if st.button("🔄 Atualizar dados da API", use_container_width=True):
-        import shutil
-        _cache_api = data_dir / ".cache"
-        for _f in _cache_api.glob("api_*.pkl"):
-            _f.unlink(missing_ok=True)
+        _cache_api = Path(__file__).parent / "data" / ".cache"
+        for _pkl in _cache_api.glob("api_*.pkl"):
+            _pkl.unlink(missing_ok=True)
         st.cache_data.clear()
         st.rerun()
 
@@ -909,6 +908,33 @@ pagina = st.session_state.active_page
 # MÓDULO: DASHBOARD
 # ══════════════════════════════════════════════════════════════════════════════
 if pagina == 'Dashboard':
+
+    # ── Seletor de data da carteira (API) ─────────────────────────────────────
+    _dc1, _dc2, _dc3 = st.columns([2, 1, 5])
+    with _dc1:
+        _api_date_sel = st.date_input(
+            "Posição da carteira",
+            value=_hoje,
+            max_value=_hoje,
+            format="DD/MM/YYYY",
+            key="dash_api_date",
+            help="Escolha a data para buscar a composição da carteira via API Caceis",
+        )
+    with _dc2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        _buscar_data = st.button("🔄 Buscar", key="dash_buscar_api", type="primary")
+
+    _api_date_str = _api_date_sel.strftime("%Y-%m-%d")
+
+    # Se o usuário escolheu uma data diferente da carteira já carregada, refaz a busca
+    if _api_date_str != _data_carteira or _buscar_data:
+        with st.spinner(f"Buscando carteira de {_api_date_sel.strftime('%d/%m/%Y')}..."):
+            _cart_sel, _dt_sel = load_carteira_api(data=_api_date_str, pl=pl)
+        if not _cart_sel.empty:
+            _dash_carteira = _cart_sel
+            _dash_eng      = ComplianceEngine(_dash_carteira, pl, extra_segmentos=extra_segmentos)
+            _dash_resumo   = _dash_eng.resumo_segmentos()
+            _dash_counts   = _dash_eng.contagem_status()
 
     # Quando há carteira histórica para o mês, usa ela (dinâmica).
     # Só cai para o balancete se for o mês corrente (sem snapshot histórico).

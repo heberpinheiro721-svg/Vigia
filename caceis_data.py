@@ -268,7 +268,10 @@ def load_carteira_api(data: str | None = None, pl: float | None = None) -> tuple
     DataFrame vazio + data_usada="" indica falha total.
     Cache em disco por 1h para evitar espera a cada reinício.
     """
-    cached = _disk_load("carteira", 3600)
+    # Cache em disco com chave por data (evita servir data errada)
+    _d_base = data or date.today().isoformat()
+    _cache_key = f"carteira_{_d_base}"
+    cached = _disk_load(_cache_key, 3600)
     if cached is not None:
         return cached
 
@@ -319,5 +322,5 @@ def load_carteira_api(data: str | None = None, pl: float | None = None) -> tuple
         "cliente", "descricao", "cnpj",
         "val_liquido", "val_ajustado", "pct_pl_calc", "segmento", "_total_raw",
     ]], data_str)
-    _disk_save("carteira", result)
+    _disk_save(_cache_key, result)
     return result
