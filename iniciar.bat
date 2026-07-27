@@ -59,7 +59,8 @@ echo Iniciando VIGIA em http://localhost:8501
 echo Pressione Ctrl+C para encerrar.
 echo.
 
-"%VENV%\Scripts\streamlit.exe" run app.py
+start "" "http://localhost:8501"
+"%VENV%\Scripts\streamlit.exe" run app.py --server.headless true
 
 echo.
 echo VIGIA encerrado.
