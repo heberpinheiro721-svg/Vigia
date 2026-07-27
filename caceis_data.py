@@ -5,15 +5,43 @@ puxando dados direto da API Caceis em tempo real.
 """
 from __future__ import annotations
 
+import pickle
+import time
 import xml.etree.ElementTree as ET
 from datetime import date, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 import pandas as pd
 import requests
 import streamlit as st
 
 from caceis_api import _base_url, _soap_headers, FUNDOS
+
+# ── Cache em disco ─────────────────────────────────────────────────────────────
+_CACHE_DIR = Path(__file__).parent / "data" / ".cache"
+
+
+def _disk_load(key: str, max_age_s: int) -> object | None:
+    p = _CACHE_DIR / f"api_{key}.pkl"
+    if not p.exists():
+        return None
+    if time.time() - p.stat().st_mtime > max_age_s:
+        return None
+    try:
+        with open(p, "rb") as f:
+            return pickle.load(f)
+    except Exception:
+        return None
+
+
+def _disk_save(key: str, data: object) -> None:
+    try:
+        _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        with open(_CACHE_DIR / f"api_{key}.pkl", "wb") as f:
+            pickle.dump(data, f)
+    except Exception:
+        pass
 
 
 def _v(row: ET.Element, tag: str) -> str:
@@ -114,12 +142,17 @@ def _fetch_cotas(nome: str, cust: str, data_ini: str, data_fim: str) -> list[dic
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
-def load_cotas_api(meses: int = 18) -> pd.DataFrame:
+def load_cotas_api(meses: int = 12) -> pd.DataFrame:
     """
     Substitui load_cotas_all() do CSV Mapa de Evolução de Cotas.
     Retorna DataFrame com: Data, Cota, Patrimônio, Cliente, fundo,
     Dia_pct, Mês_pct, Ano_pct, Total_pct, cota_base100.
+    Cache em disco por 24h para evitar lentidão no primeiro carregamento.
     """
+    cached = _disk_load("cotas", 86400)
+    if cached is not None:
+        return cached
+
     hoje = date.today()
     data_ini = (hoje.replace(day=1) - timedelta(days=meses * 30)).strftime("%Y-%m-%d")
     data_fim = hoje.strftime("%Y-%m-%d")
@@ -157,10 +190,12 @@ def load_cotas_api(meses: int = 18) -> pd.DataFrame:
         axis=1,
     )
 
-    return df[[
+    result = df[[
         "Data", "Cota", "Patrimônio", "Cliente", "fundo", "cliente_orig",
         "Dia_pct", "Mês_pct", "Ano_pct", "Total_pct", "cota_base100",
     ]]
+    _disk_save("cotas", result)
+    return result
 
 
 # ── Composição da Carteira (compliance) ───────────────────────────────────────
@@ -229,7 +264,12 @@ def load_carteira_api(data: str | None = None, pl: float | None = None) -> tuple
     Substitui load_carteira_s3(filepath, patrimonio_liquido).
     Retorna (DataFrame, data_usada). Tenta hoje → até 5 dias úteis anteriores.
     DataFrame vazio + data_usada="" indica falha total.
+    Cache em disco por 1h para evitar espera a cada reinício.
     """
+    cached = _disk_load("carteira", 3600)
+    if cached is not None:
+        return cached
+
     d = date.fromisoformat(data) if data else date.today()
     while d.weekday() >= 5:
         d -= timedelta(days=1)
@@ -273,7 +313,9 @@ def load_carteira_api(data: str | None = None, pl: float | None = None) -> tuple
     df["cnpj"]         = df["codigo"]
     df["_total_raw"]   = total_raw
 
-    return df[[
+    result = (df[[
         "cliente", "descricao", "cnpj",
         "val_liquido", "val_ajustado", "pct_pl_calc", "segmento", "_total_raw",
-    ]], data_str
+    ]], data_str)
+    _disk_save("carteira", result)
+    return result
