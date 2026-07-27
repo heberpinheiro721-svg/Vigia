@@ -133,36 +133,49 @@ def _parse_cotas_range(xml_text: str, fundo_curto: str) -> list[dict]:
     return list(by_date.values())
 
 
-def _fetch_cotas(nome: str, cust: str, data_ini: str, data_fim: str) -> list[dict]:
+def _fetch_cotas_mes(nome: str, cust: str, ano: int, mes: int) -> list[dict]:
+    """Busca cotas de um único mês para um fundo."""
+    import calendar as _cal
+    ini = date(ano, mes, 1).strftime("%Y-%m-%d")
+    fim = date(ano, mes, _cal.monthrange(ano, mes)[1]).strftime("%Y-%m-%d")
     try:
-        xml = _soap_request(cust, data_ini, data_fim)
+        xml = _soap_request(cust, ini, fim)
         return _parse_cotas_range(xml, _NOME_CURTO[nome])
     except Exception:
         return []
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
-def load_cotas_api(meses: int = 12) -> pd.DataFrame:
+def load_cotas_api(meses: int = 6) -> pd.DataFrame:
     """
     Substitui load_cotas_all() do CSV Mapa de Evolução de Cotas.
-    Retorna DataFrame com: Data, Cota, Patrimônio, Cliente, fundo,
-    Dia_pct, Mês_pct, Ano_pct, Total_pct, cota_base100.
-    Cache em disco por 24h para evitar lentidão no primeiro carregamento.
+    Busca mês a mês em paralelo (evita timeout de ranges longos).
+    Cache em disco por 24h.
     """
     cached = _disk_load("cotas", 86400)
     if cached is not None:
         return cached
 
+    # Gera lista de (ano, mes) dos últimos N meses
     hoje = date.today()
-    data_ini = (hoje.replace(day=1) - timedelta(days=meses * 30)).strftime("%Y-%m-%d")
-    data_fim = hoje.strftime("%Y-%m-%d")
+    periodos: list[tuple[int, int]] = []
+    for i in range(meses):
+        m = hoje.month - i
+        y = hoje.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        periodos.append((y, m))
+
+    # 4 fundos × N meses em paralelo
+    tarefas = [(nome, cust, y, m)
+               for nome, cust in FUNDOS.items()
+               for y, m in periodos]
 
     registros: list[dict] = []
-    with ThreadPoolExecutor(max_workers=4) as ex:
-        futures = {
-            ex.submit(_fetch_cotas, nome, cust, data_ini, data_fim): nome
-            for nome, cust in FUNDOS.items()
-        }
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = [ex.submit(_fetch_cotas_mes, nome, cust, y, m)
+                   for nome, cust, y, m in tarefas]
         for fut in as_completed(futures):
             registros.extend(fut.result())
 
