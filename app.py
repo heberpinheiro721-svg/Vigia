@@ -1153,7 +1153,7 @@ if pagina == 'Dashboard':
             else:
                 st.info("Dados de cotas insuficientes para calcular a meta.")
         else:
-            st.info("Carregue o CSV de cotas para ver a meta atuarial.")
+            st.info("Dados de cotas não disponíveis via API Caceis.")
 
     # ── Benchmarks ───────────────────────────────────────────────────────────
     with col_bm:
@@ -1301,7 +1301,7 @@ if pagina == 'Dashboard':
         html_rend += "</table>"
         st.markdown(f'<div class="tabela-scroll">{html_rend}</div>', unsafe_allow_html=True)
     else:
-        st.info("Carregue o CSV de cotas para visualizar os rendimentos dos planos.")
+        st.info("Dados de cotas não disponíveis via API Caceis.")
 
     # ── Briefing VIGIA (IA) ───────────────────────────────────────────────────
     if api_key:
@@ -2066,7 +2066,7 @@ elif pagina == 'Comparativo':
         st.plotly_chart(fig, use_container_width=True)
 
     else:
-        st.info("Carregue o CSV de cotas para ver o comparativo com os fundos IAJA.")
+        st.info("Dados de cotas não disponíveis via API Caceis.")
 
     # ── Top fundos por categoria ──────────────────────────────────────────────
     st.markdown("---")
