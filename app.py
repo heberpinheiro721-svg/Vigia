@@ -660,6 +660,7 @@ with st.sidebar:
         "📊 Dashboard":           "Dashboard",
         "📅 Evolução Mensal":     "Evolução Mensal",
         "💼 Posição Financeira":  "Posição Financeira",
+        "🔗 Dados Caceis":        "Dados Caceis",
         "📉 Performance":         "Performance",
         "🏆 Comparativo de Mercado": "Comparativo",
         "📈 Risco Avançado":      "Risco Avançado",
@@ -3039,6 +3040,113 @@ elif pagina == 'Histórico':
             plot_bgcolor='#F8FAFC', paper_bgcolor='#F8FAFC',
         )
         st.plotly_chart(fig_pat, width='stretch', config={'displayModeBar': False})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MÓDULO: DADOS CACEIS
+# ══════════════════════════════════════════════════════════════════════════════
+elif pagina == 'Dados Caceis':
+    from caceis_api import get_resumo_caceis, FUNDOS as _CACEIS_FUNDOS
+    import xml.etree.ElementTree as _ET
+
+    st.markdown('<div class="secao-titulo">🔗 Dados em Tempo Real — Caceis</div>', unsafe_allow_html=True)
+
+    # Seletor de data
+    _col_d, _col_b, _ = st.columns([2, 1, 4])
+    with _col_d:
+        from datetime import date as _date
+        _data_sel = st.date_input("Data de referência", value=_date.today(), max_value=_date.today())
+    with _col_b:
+        st.markdown("<br>", unsafe_allow_html=True)
+        _buscar = st.button("🔄 Buscar dados", type="primary")
+
+    if _buscar:
+        st.cache_data.clear()
+
+    _data_str = _data_sel.strftime("%Y-%m-%d")
+
+    with st.spinner("Buscando dados do Caceis..."):
+        _res = get_resumo_caceis(_data_str)
+
+    _planos = _res.get("planos", {})
+    if not any(_planos.values()):
+        st.warning(f"Sem dados para {_data_sel.strftime('%d/%m/%Y')}. Tente uma data anterior (dia útil).")
+        st.stop()
+
+    # ── KPIs por plano ────────────────────────────────────────────────────────
+    st.markdown(f"#### Posição em {_data_sel.strftime('%d/%m/%Y')}")
+
+    _ordem = ["Alpha", "Beta", "Gama", "PGA"]
+    _cols_kpi = st.columns(len(_ordem))
+    _total_pat = sum(_planos.get(p, {}).get("patrimonio", 0) for p in _ordem)
+
+    for i, plano in enumerate(_ordem):
+        d = _planos.get(plano, {})
+        pat = d.get("patrimonio", 0)
+        rent = d.get("rent", {})
+        with _cols_kpi[i]:
+            st.markdown(f"**{plano}**")
+            st.metric("Patrimônio", f"R$ {pat/1e6:.1f} MM")
+            st.metric("Cota", f"{d.get('vlr_cota', 0):.6f}")
+            st.metric("Var. Mês", f"{rent.get('mensal', 0):+.2f}%")
+            st.metric("% CDI mês", f"{rent.get('pct_cdi', 0):.1f}%")
+
+    st.metric("**Total Consolidado**", f"R$ {_total_pat/1e9:.3f} bi")
+
+    st.divider()
+
+    # ── Rentabilidade detalhada ───────────────────────────────────────────────
+    st.markdown("#### Rentabilidade por Plano")
+    _rent_rows = []
+    for plano in _ordem:
+        d = _planos.get(plano, {})
+        r = d.get("rent", {})
+        _rent_rows.append({
+            "Plano":     plano,
+            "Dia %":     r.get("diaria", 0),
+            "Mês %":     r.get("mensal", 0),
+            "Ano %":     r.get("anual", 0),
+            "12 meses %": r.get("ult_12m", 0),
+            "% CDI":     r.get("pct_cdi", 0),
+            "Patrimônio": d.get("patrimonio", 0),
+        })
+    _df_rent = pd.DataFrame(_rent_rows).set_index("Plano")
+
+    def _fmt_rent(v):
+        if isinstance(v, float) and "%" in str(v):
+            return f"{v:+.4f}%"
+        return v
+
+    st.dataframe(
+        _df_rent.style.format({
+            "Dia %": "{:+.4f}%", "Mês %": "{:+.4f}%",
+            "Ano %": "{:+.4f}%", "12 meses %": "{:+.4f}%",
+            "% CDI": "{:.2f}%",
+            "Patrimônio": "R$ {:,.2f}",
+        }),
+        width='stretch',
+    )
+
+    st.divider()
+
+    # ── Composição por plano (Fundos de Investimento) ─────────────────────────
+    st.markdown("#### Composição da Carteira — Fundos de Investimento")
+    _plano_sel = st.selectbox("Plano:", _ordem, key="caceis_plano_fi")
+    _fi_list = _planos.get(_plano_sel, {}).get("fi", [])
+    if _fi_list:
+        _df_fi = pd.DataFrame(_fi_list).rename(columns={
+            "fundo": "Fundo", "instituicao": "Gestora",
+            "vl_atual": "Valor Atual (R$)", "pct_total": "% Carteira",
+        })
+        _df_fi = _df_fi[["Fundo", "Gestora", "Valor Atual (R$)", "% Carteira"]].sort_values(
+            "% Carteira", ascending=False
+        )
+        st.dataframe(
+            _df_fi.style.format({"Valor Atual (R$)": "R$ {:,.2f}", "% Carteira": "{:.2f}%"}),
+            width='stretch', hide_index=True,
+        )
+    else:
+        st.info("Sem posição em fundos de investimento nesta data.")
 
 
 if __name__ == '__main__':
