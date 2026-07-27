@@ -12,14 +12,14 @@ import calendar as _calendar_app
 from datetime import date, timedelta
 from pathlib import Path
 
-from parser import load_carteira_s3
 from composicao_historica import load_carteira_historica, carteira_para_mes
 from rules_engine import ComplianceEngine, SEGMENT_LIMITS
 from ai_analysis import gerar_analise_compliance, chat_vigia, chat_persona, PERSONAS
 from email_sender import enviar_relatorio_email
 from report_generator import gerar_pdf
 from historico import salvar_snapshot, carregar_historico, historico_para_dataframe
-from performance import load_cotas, load_cotas_all, ultima_posicao, achar_cotas_csv
+from performance import load_cotas, ultima_posicao
+from caceis_data import load_cotas_api, load_carteira_api
 from balancete_parser import parse_balancete, achar_balancete, listar_balancetes
 from evolucao_mensal import montar_tabela_mensal, tabela_para_texto
 from posicao_financeira import listar_posicoes, parse_posicao, gerar_pdf_posicao
@@ -660,7 +660,6 @@ with st.sidebar:
         "📊 Dashboard":           "Dashboard",
         "📅 Evolução Mensal":     "Evolução Mensal",
         "💼 Posição Financeira":  "Posição Financeira",
-        "🔗 Dados Caceis":        "Dados Caceis",
         "📉 Performance":         "Performance",
         "🏆 Comparativo de Mercado": "Comparativo",
         "📈 Risco Avançado":      "Risco Avançado",
@@ -690,10 +689,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### ⚙️ Dados")
 
-    uploaded = st.file_uploader("Upload CSV Composição", type=['csv'])
     uploaded_bal = st.file_uploader("Upload PDF Balancete", type=['pdf'])
-    uploaded_cotas = st.file_uploader("Upload CSV Cotas", type=['csv'], key="cotas_upload")
-    usar_local = st.checkbox("Usar arquivo local (data/Composição/)", value=True)
     data_ref = st.text_input("Data de referência", value=DATA_DEFAULT)
 
     _raw_keys = st.secrets.get("GROQ_API_KEYS", None) if hasattr(st, "secrets") else None
@@ -746,40 +742,6 @@ def _cached_balancete(path_str: str, mtime: float):
     return result
 
 
-@st.cache_data(show_spinner=False)
-def _cached_carteira(path_str: str, mtime: float, pl: float):
-    key = f"carteira_{pl:.0f}"
-    cached = _disk_load(key, mtime)
-    if cached is not None:
-        return cached
-    result = load_carteira_s3(Path(path_str), pl)
-    _disk_save(key, mtime, result)
-    return result
-
-
-@st.cache_data(show_spinner=False)
-def _cached_cotas(paths_str: tuple, mtime_sum: float):
-    cached = _disk_load("cotas", mtime_sum)
-    if cached is not None:
-        return cached
-    result = load_cotas_all([Path(p) for p in paths_str])
-    _disk_save("cotas", mtime_sum, result)
-    return result
-
-
-@st.cache_data(show_spinner=False)
-def _cached_compliance(path_str: str, mtime: float, pl: float, emprestimos: float):
-    key = f"compliance_{pl:.0f}_{emprestimos:.0f}"
-    cached = _disk_load(key, mtime)
-    if cached is not None:
-        return cached
-    carteira = load_carteira_s3(Path(path_str), pl)
-    extra = {'Operações com Participantes': emprestimos} if emprestimos else {}
-    eng = ComplianceEngine(carteira, pl, extra_segmentos=extra)
-    result = eng.resumo_segmentos(), eng.contagem_status()
-    _disk_save(key, mtime, result)
-    return result
-
 @st.cache_data(ttl=3600, show_spinner=False)
 def _cached_carteira_hist(data_dir_str: str, mtime_hash: float):
     return load_carteira_historica(Path(data_dir_str))
@@ -814,48 +776,26 @@ if bal_path:
 else:
     st.sidebar.info("Adicione o balancete em `data/Balancete/`.")
 
-# 2. Carteira
-filepath = None
-if uploaded:
-    dest = data_dir / "Composição" / uploaded.name
-    dest.parent.mkdir(exist_ok=True)
-    dest.write_bytes(uploaded.read())
-    filepath = dest
-elif usar_local:
-    comp_dir = data_dir / "Composição"
-    csvs = sorted(comp_dir.glob("*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if csvs:
-        filepath = csvs[0]
-
-if not filepath or not filepath.exists():
-    st.info("👈  Carregue o relatório S3 Caceis no painel lateral para começar.")
+# 2. Carteira via API Caceis
+with st.spinner("Carregando carteira via Caceis..."):
+    carteira = load_carteira_api(pl=pl)
+if carteira.empty:
+    st.warning("Não foi possível carregar a composição da carteira via API Caceis. Verifique a conexão.")
     st.stop()
-
-try:
-    carteira = _cached_carteira(str(filepath), filepath.stat().st_mtime, pl)
-    st.sidebar.success(f"✅ {filepath.name}  ({len(carteira)} posições)")
-except Exception as e:
-    st.sidebar.error(f"Erro no CSV: {e}")
-    st.stop()
+st.sidebar.success(f"✅ Carteira Caceis ({len(carteira)} posições)")
 
 emprestimos_val = bal_dados['consolidado']['emprestimos_participantes'] if bal_dados else 0.0
-resumo, counts = _cached_compliance(str(filepath), filepath.stat().st_mtime, pl, emprestimos_val)
-
 engine = ComplianceEngine(carteira, pl, extra_segmentos=extra_segmentos)
+resumo = engine.resumo_segmentos()
+counts = engine.contagem_status()
 
-# 3. Cotas
+# 3. Cotas via API Caceis
 df_cotas = None
-cotas_paths = achar_cotas_csv(data_dir)
-if uploaded_cotas:
-    dest_cotas = data_dir / "cotas" / uploaded_cotas.name
-    dest_cotas.parent.mkdir(parents=True, exist_ok=True)
-    dest_cotas.write_bytes(uploaded_cotas.read())
-    if dest_cotas not in cotas_paths:
-        cotas_paths = sorted(cotas_paths + [dest_cotas], key=lambda x: x.name)
-if cotas_paths:
+with st.spinner("Carregando histórico de cotas..."):
     try:
-        _mtime_sum = sum(p.stat().st_mtime for p in cotas_paths)
-        df_cotas = _cached_cotas(tuple(str(p) for p in cotas_paths), _mtime_sum)
+        _cotas_tmp = load_cotas_api()
+        if not _cotas_tmp.empty:
+            df_cotas = _cotas_tmp
     except Exception as e:
         st.sidebar.warning(f"Cotas: {e}")
 
@@ -1439,7 +1379,7 @@ elif pagina == 'Evolução Mensal':
     st.caption("Retornos mensais dos planos frente aos principais benchmarks.")
 
     if df_cotas is None:
-        st.info("Arquivo de cotas não encontrado em `data/cotas/`.")
+        st.info("Dados de cotas não disponíveis via API Caceis.")
         st.stop()
 
     @st.cache_data(ttl=86400, show_spinner=False)
@@ -1774,7 +1714,7 @@ elif pagina == 'Performance':
     st.markdown('<div class="secao-titulo">📉 Performance dos Fundos</div>', unsafe_allow_html=True)
 
     if df_cotas is None:
-        st.info("Adicione o CSV 'Mapa de Evolução da Cotas' na pasta `data/cotas/`.")
+        st.info("Dados de cotas não disponíveis via API Caceis.")
         st.stop()
 
     ultimo = ultima_posicao(df_cotas)
@@ -2123,7 +2063,7 @@ elif pagina == 'Risco Avançado':
     st.markdown('<div class="secao-titulo">📈 Risco Avançado</div>', unsafe_allow_html=True)
 
     if df_cotas is None:
-        st.info("Adicione o CSV de Cotas para calcular métricas de risco.")
+        st.info("Dados de cotas não disponíveis via API Caceis.")
         st.stop()
 
     tab_var, tab_dd, tab_corr, tab_stress = st.tabs([
@@ -3042,111 +2982,6 @@ elif pagina == 'Histórico':
         st.plotly_chart(fig_pat, width='stretch', config={'displayModeBar': False})
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MÓDULO: DADOS CACEIS
-# ══════════════════════════════════════════════════════════════════════════════
-elif pagina == 'Dados Caceis':
-    from caceis_api import get_resumo_caceis, FUNDOS as _CACEIS_FUNDOS
-    import xml.etree.ElementTree as _ET
-
-    st.markdown('<div class="secao-titulo">🔗 Dados em Tempo Real — Caceis</div>', unsafe_allow_html=True)
-
-    # Seletor de data
-    _col_d, _col_b, _ = st.columns([2, 1, 4])
-    with _col_d:
-        from datetime import date as _date
-        _data_sel = st.date_input("Data de referência", value=_date.today(), max_value=_date.today())
-    with _col_b:
-        st.markdown("<br>", unsafe_allow_html=True)
-        _buscar = st.button("🔄 Buscar dados", type="primary")
-
-    if _buscar:
-        st.cache_data.clear()
-
-    _data_str = _data_sel.strftime("%Y-%m-%d")
-
-    with st.spinner("Buscando dados do Caceis..."):
-        _res = get_resumo_caceis(_data_str)
-
-    _planos = _res.get("planos", {})
-    if not any(_planos.values()):
-        st.warning(f"Sem dados para {_data_sel.strftime('%d/%m/%Y')}. Tente uma data anterior (dia útil).")
-        st.stop()
-
-    # ── KPIs por plano ────────────────────────────────────────────────────────
-    st.markdown(f"#### Posição em {_data_sel.strftime('%d/%m/%Y')}")
-
-    _ordem = ["Alpha", "Beta", "Gama", "PGA"]
-    _cols_kpi = st.columns(len(_ordem))
-    _total_pat = sum(_planos.get(p, {}).get("patrimonio", 0) for p in _ordem)
-
-    for i, plano in enumerate(_ordem):
-        d = _planos.get(plano, {})
-        pat = d.get("patrimonio", 0)
-        rent = d.get("rent", {})
-        with _cols_kpi[i]:
-            st.markdown(f"**{plano}**")
-            st.metric("Patrimônio", f"R$ {pat/1e6:.1f} MM")
-            st.metric("Cota", f"{d.get('vlr_cota', 0):.6f}")
-            st.metric("Var. Mês", f"{rent.get('mensal', 0):+.2f}%")
-            st.metric("% CDI mês", f"{rent.get('pct_cdi', 0):.1f}%")
-
-    st.metric("**Total Consolidado**", f"R$ {_total_pat/1e9:.3f} bi")
-
-    st.divider()
-
-    # ── Rentabilidade detalhada ───────────────────────────────────────────────
-    st.markdown("#### Rentabilidade por Plano")
-    _rent_rows = []
-    for plano in _ordem:
-        d = _planos.get(plano, {})
-        r = d.get("rent", {})
-        _rent_rows.append({
-            "Plano":     plano,
-            "Dia %":     r.get("diaria", 0),
-            "Mês %":     r.get("mensal", 0),
-            "Ano %":     r.get("anual", 0),
-            "12 meses %": r.get("ult_12m", 0),
-            "% CDI":     r.get("pct_cdi", 0),
-            "Patrimônio": d.get("patrimonio", 0),
-        })
-    _df_rent = pd.DataFrame(_rent_rows).set_index("Plano")
-
-    def _fmt_rent(v):
-        if isinstance(v, float) and "%" in str(v):
-            return f"{v:+.4f}%"
-        return v
-
-    st.dataframe(
-        _df_rent.style.format({
-            "Dia %": "{:+.4f}%", "Mês %": "{:+.4f}%",
-            "Ano %": "{:+.4f}%", "12 meses %": "{:+.4f}%",
-            "% CDI": "{:.2f}%",
-            "Patrimônio": "R$ {:,.2f}",
-        }),
-        width='stretch',
-    )
-
-    st.divider()
-
-    # ── Composição por plano (Fundos de Investimento) ─────────────────────────
-    st.markdown("#### Composição da Carteira — Fundos de Investimento")
-    _plano_sel = st.selectbox("Plano:", _ordem, key="caceis_plano_fi")
-    _fi_list = _planos.get(_plano_sel, {}).get("fi", [])
-    if _fi_list:
-        _df_fi = pd.DataFrame(_fi_list).rename(columns={
-            "fundo": "Fundo", "instituicao": "Gestora",
-            "vl_atual": "Valor Atual (R$)", "pct_total": "% Carteira",
-        })
-        _df_fi = _df_fi[["Fundo", "Gestora", "Valor Atual (R$)", "% Carteira"]].sort_values(
-            "% Carteira", ascending=False
-        )
-        st.dataframe(
-            _df_fi.style.format({"Valor Atual (R$)": "R$ {:,.2f}", "% Carteira": "{:.2f}%"}),
-            width='stretch', hide_index=True,
-        )
-    else:
-        st.info("Sem posição em fundos de investimento nesta data.")
 
 
 if __name__ == '__main__':
