@@ -194,7 +194,9 @@ def load_cotas_api(meses: int = 12) -> pd.DataFrame:
         "Data", "Cota", "Patrimônio", "Cliente", "fundo", "cliente_orig",
         "Dia_pct", "Mês_pct", "Ano_pct", "Total_pct", "cota_base100",
     ]]
-    _disk_save("cotas", result)
+    # Só salva em disco se todos os 4 fundos retornaram dados
+    if set(result["fundo"].unique()) >= set(_NOME_CURTO.values()):
+        _disk_save("cotas", result)
     return result
 
 

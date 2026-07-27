@@ -691,6 +691,13 @@ with st.sidebar:
 
     uploaded_bal = st.file_uploader("Upload PDF Balancete", type=['pdf'])
     data_ref = st.text_input("Data de referência", value=DATA_DEFAULT)
+    if st.button("🔄 Atualizar dados da API", use_container_width=True):
+        import shutil
+        _cache_api = data_dir / ".cache"
+        for _f in _cache_api.glob("api_*.pkl"):
+            _f.unlink(missing_ok=True)
+        st.cache_data.clear()
+        st.rerun()
 
     _raw_keys = st.secrets.get("GROQ_API_KEYS", None) if hasattr(st, "secrets") else None
     if _raw_keys:
